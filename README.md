@@ -3,20 +3,22 @@
 ## Run
 
 1. Download dataset from https://download.pytorch.org/tutorial/data.zip
-2. Prepare validation indices by `python dataset.py`
+2. Prepare validation indices by `python data_prepare.py`
 3. Run: `python train.py`
 
 Etc:
 
 - Hyperparams are in `train.py`.
-- `mkdir evals` for visualizing attention.
 
 ## ToDo
 
+- Torchtext
+- Self-attention
 - Transformer
 - ConvS2S
+- Config
+- Add pre-trained word embeddings
 - Other dataset
-- Torchtext?
 
 ## References
 

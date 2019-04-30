@@ -1,15 +1,22 @@
 import unicodedata
 import re
 import random
+import numpy as np
+from lang import Lang
+import utils
+import pickle
+from functools import partial
+from collections import Counter
 
 
-PAD_token = 0
-SOS_token = 1
-EOS_token = 2
+PAD_idx = 0
+SOS_idx = 1
+EOS_idx = 2
+
 
 # 데이터셋에는 13만개의 eng-fra pair 가 있는데,
 # 이 튜토리얼에서는 아래의 prefix 로 시작하고, 최대 길이가 10 이하인 페어들만 사용한다.
-MAX_LENGTH = 10
+MAX_LENGTH = 14
 eng_prefixes = (
     "i am ", "i m ",
     "he is", "he s ",
@@ -18,28 +25,6 @@ eng_prefixes = (
     "we are", "we re ",
     "they are", "they re "
 )
-
-
-class Lang:
-    def __init__(self, name):
-        self.name = name
-        self.word2idx = {}
-        self.word2cnt = {} # count word frequency
-        self.idx2word = ["PAD", "SOS", "EOS"]
-        self.n_words = 3
-
-    def add_word(self, word):
-        if word not in self.word2idx:
-            self.word2idx[word] = self.n_words
-            self.word2cnt[word] = 1
-            self.idx2word.append(word)
-            self.n_words += 1
-        else:
-            self.word2cnt[word] += 1
-
-    def add_sentence(self, sentence):
-        for word in sentence.split(' '):
-            self.add_word(word)
 
 
 # unicode => ascii
@@ -81,28 +66,88 @@ def read_langs(lang1, lang2, reverse=False):
     return Lang(lang1), Lang(lang2), pairs
 
 
-def filter_pair(pair):
+def filter_len(pair):
+    return len(pair[0].split(' ')) < MAX_LENGTH and len(pair[1].split(' ')) < MAX_LENGTH
+
+
+def filter_eng_prefix(pair):
     # assume that pair[1] is eng.
-    return len(pair[0].split(' ')) < MAX_LENGTH and len(pair[1].split(' ')) < MAX_LENGTH and \
-            pair[1].startswith(eng_prefixes)
+    return pair[1].startswith(eng_prefixes)
 
 
-def prepare_data(lang1, lang2, reverse=False):
-    input_lang, output_lang, pairs = read_langs(lang1, lang2, reverse)
+def prepare_data():
+    """
+    reverse: if true, lang2 => input lang, lang1 => output lang.
+
+    1. read sentence pairs
+    2. filter the pairs
+    3. construct langs from the pairs
+    """
+    # ready pairs
+    input_lang, output_lang, pairs = read_langs("eng", "fra", True)
     print(f"Read {len(pairs)} sentence pairs")
-    pairs = list(filter(filter_pair, pairs))
+
+    # filter pairs
+    pairs = filter(filter_len, pairs)
+    #pairs = filter(filter_eng_prefix, pairs)
+    pairs = list(pairs)
     print(f"Trimmed to {len(pairs)} sentece pairs")
+
+    # counting words
     print("Counting words ...")
+    counter1 = Counter()
+    counter2 = Counter()
     for pair in pairs:
+        counter1.update(pair[0].split(' '))
+        counter2.update(pair[1].split(' '))
+    print("Lang1 most common: ", counter1.most_common(10))
+    print("Lang2 most common: ", counter2.most_common(10))
+
+    c1 = list(filter(lambda x: x[1] >= 2, counter1.items()))
+    c2 = list(filter(lambda x: x[1] >= 2, counter2.items()))
+
+    print(f"#Lang1: {len(counter1)} => {len(c1)}")
+    print(f"#Lang2: {len(counter2)} => {len(c2)}")
+
+    print("Making word dictionary ...")
+    max_len = 0
+    for pair in pairs:
+
+        l1 = len(pair[0].split(' '))
+        l2 = len(pair[1].split(' '))
+        if max_len < l1:
+            max_len = l1
+        if max_len < l2:
+            max_len = l2
         input_lang.add_sentence(pair[0])
         output_lang.add_sentence(pair[1])
+
+    print(f"Max len = {max_len}")
 
     print("Counted words:")
     print(input_lang.name, input_lang.n_words)
     print(output_lang.name, output_lang.n_words)
+
+    print("Caching ... ")
+    N = len(pairs)
+    utils.makedirs("cache")
+    input_lang.dump_to_file("cache/in-{}-{}.pkl".format(input_lang.name, N))
+    output_lang.dump_to_file("cache/out-{}-{}.pkl".format(output_lang.name, N))
+    path = "cache/{}2{}-{}.pkl".format(input_lang.name, output_lang.name, N)
+    pickle.dump(pairs, open(path, "wb"))
+    print(f"pairs dumped to {path}")
+
     return input_lang, output_lang, pairs
 
 
 if __name__ == "__main__":
-    input_lang, output_lang, pairs = prepare_data('eng', 'fra', True)
+    input_lang, output_lang, pairs = prepare_data()
     print(random.choice(pairs))
+
+    # gen validation indices
+    N = len(pairs)
+    N_valid = int(N * 0.1)
+    valid_indices = np.random.choice(N, N_valid)
+    path = "valid_indices.npy"
+    np.save(path, valid_indices)
+    print(f"Valid indices dumped to {path} -- {N_valid}/{N}")

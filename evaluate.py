@@ -11,7 +11,7 @@ def idx2words(indices, lang):
     words = []
     for idx in indices:
         words.append(lang.idx2word[idx])
-        if idx == dp.EOS_token:
+        if idx == dp.EOS_idx:
             break
     return words
 
@@ -31,7 +31,7 @@ def random_eval(dset, seq2seq, N=3):
         # [1, max_len, out_lang.n_words]
         src = src.cuda()
         src_len = src_len.cuda()
-        dec_outs, attn_ws = seq2seq(src, src_len, None, teacher_forcing_ratio=0., max_len=dp.MAX_LENGTH)
+        dec_outs, attn_ws = seq2seq.generate(src, src_len)
         topi = dec_outs.topk(1)[1] # [1, max_len, 1]
         out_words = idx2words(topi.squeeze(), out_lang)
         out_sentence = ' '.join(out_words)
@@ -50,8 +50,7 @@ def showAttention(input_sentence, output_words, attentions, file_path):
     fig.colorbar(cax)
 
     # Set up axes
-    ax.set_xticklabels([''] + input_sentence.split(' ') +
-                       ['EOS'], rotation=90)
+    ax.set_xticklabels([''] + input_sentence.split(' ') + ['EOS'], rotation=90)
     ax.set_yticklabels([''] + output_words)
 
     # Show label at every tick
@@ -65,11 +64,11 @@ def showAttention(input_sentence, output_words, attentions, file_path):
 
 def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
     seq2seq.eval()
-    src = [in_lang.word2idx[word] for word in in_s.split(' ')] + [dp.EOS_token]
+    src = [in_lang.word2idx[word] for word in in_s.split(' ')] + [dp.EOS_idx]
     src_len = len(src)
     src = torch.LongTensor(src).view(1, -1).cuda()
     src_len = torch.LongTensor([src_len]).view(1).cuda()
-    dec_outs, attn_ws = seq2seq(src, src_len, None, teacher_forcing_ratio=0., max_len=dp.MAX_LENGTH)
+    dec_outs, attn_ws = seq2seq.generate(src, src_len)
     topi = dec_outs.topk(1)[1] # [1, max_len, 1]
     out_words = idx2words(topi.squeeze(), out_lang)
 
@@ -80,7 +79,7 @@ def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
     return attn_ws
 
 
-def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch):
+def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn=False):
     esa = partial(evaluateAndShowAttention, seq2seq=seq2seq, in_lang=in_lang,
                   out_lang=out_lang)
     sens = [
@@ -92,5 +91,5 @@ def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch):
     for i, s in enumerate(sens):
         file_path = "evals/{:02d}-{}.png".format(epoch, i)
         attn_ws = esa(s, out_file=file_path)
-        #if i == 0:
-        print(attn_ws.numpy().round(1))
+        if print_attn:
+            print(attn_ws.numpy().round(1))

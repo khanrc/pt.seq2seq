@@ -1,3 +1,6 @@
+import os
+
+
 class AverageMeter():
     """ Computes and stores the average and current value """
     def __init__(self):
@@ -16,3 +19,12 @@ class AverageMeter():
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+def makedirs(path):
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path)
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
