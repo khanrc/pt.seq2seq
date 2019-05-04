@@ -1,17 +1,18 @@
 import torch
-import data_prepare as dp
 import matplotlib.pyplot as plt
 from functools import partial
 import random
 plt.switch_backend('agg')
 import matplotlib.ticker as ticker
+from dataset import TranslationDataset
+from const import *
 
 
 def idx2words(indices, lang):
     words = []
     for idx in indices:
         words.append(lang.idx2word[idx])
-        if idx == dp.EOS_idx:
+        if idx == EOS_idx:
             break
     return words
 
@@ -64,10 +65,10 @@ def showAttention(input_sentence, output_words, attentions, file_path):
 
 def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
     seq2seq.eval()
-    src = [in_lang.word2idx[word] for word in in_s.split(' ')] + [dp.EOS_idx]
+    src = TranslationDataset.to_ids(in_s, in_lang) + [EOS_idx]
     src_len = len(src)
     src = torch.LongTensor(src).view(1, -1).cuda()
-    src_len = torch.LongTensor([src_len]).view(1).cuda()
+    src_len = torch.tensor([src_len])
     dec_outs, attn_ws = seq2seq.generate(src, src_len)
     topi = dec_outs.topk(1)[1] # [1, max_len, 1]
     out_words = idx2words(topi.squeeze(), out_lang)
@@ -79,7 +80,7 @@ def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
     return attn_ws
 
 
-def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn=False):
+def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn):
     esa = partial(evaluateAndShowAttention, seq2seq=seq2seq, in_lang=in_lang,
                   out_lang=out_lang)
     sens = [

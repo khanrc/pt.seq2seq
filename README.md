@@ -10,6 +10,20 @@ Etc:
 
 - Hyperparams are in `train.py`.
 
+## Results
+
+Hparams:
+
+eng to fra task, max\_len=14, min\_freq=2.
+BiGRU-encoder, B=256, h\_dim=1024, emb\_dim=300.
+
+Models:
+
+- Seq2Seq: 14.8
+- Seq2Seq + KVAttention: 13.5
+    - AdditiveAttention: 13.1
+    - MultiplicativeAttention: 14.1
+
 ## ToDo
 
 - Torchtext

@@ -20,20 +20,23 @@ s: [1, h_dim] (query)
 """
 
 class KeyValueAttention(nn.Module):
-    def __init__(self, q_in_dim, qk_dim, kv_in_dim, v_dim):
+    def __init__(self, q_in_dim, qk_dim, kv_in_dim, v_dim, out_dim):
         """ qkv attention.
         Assume that key source == value source.
         params:
             q_in_dim: query in dim. = decoder hidden dim.
             qk_dim: query & key dim. it should be same.
             kv_in_dim: key value in dim. = encoder hidden dim.
-            v_dim: value dim. = final attention out dim.
+            v_dim: value dim.
+            out_dim: final attention out dim.
         """
         super().__init__()
         self.q_proj = nn.Linear(q_in_dim, qk_dim)
         self.k_proj = nn.Linear(kv_in_dim, qk_dim)
         self.v_proj = nn.Linear(kv_in_dim, v_dim)
         self.scale = qk_dim ** 0.5
+
+        self.out = nn.Linear(v_dim, out_dim)
 
     def forward(self, q, s, mask):
         """
@@ -51,6 +54,7 @@ class KeyValueAttention(nn.Module):
         attn_score.masked_fill_(mask == 0, -1e10)
         attn_w = F.softmax(attn_score, dim=-1)
         attn_out = torch.einsum('bqs,bsh->bqh', attn_w, v) # [B, q_len, v_dim]
+        attn_out = self.out(attn_out)
 
         return attn_w, attn_out
 
@@ -60,6 +64,13 @@ class AdditiveAttention(nn.Module):
         score = v*tanh(W1*q + W2*s)
     """
     def __init__(self, q_dim, s_dim, h_dim, out_dim):
+        """
+        params:
+            q_dim: query dim
+            s_dim: source dim
+            h_dim: attn hidden dim
+            out_dim: final out dim
+        """
         super().__init__()
         self.q_proj = nn.Linear(q_dim, h_dim)
         self.s_proj = nn.Linear(s_dim, h_dim)
@@ -91,6 +102,13 @@ class MultiplicativeAttention(nn.Module):
         [q_len, q_dim] * [q_dim, s_dim] * [s_dim, s_len] = [q_len, s_len]
     """
     def __init__(self, q_dim, s_dim, h_dim, out_dim):
+        """
+        params:
+            q_dim: query dim
+            s_dim: source dim
+            h_dim: attn hidden dim
+            out_dim: final out dim
+        """
         super().__init__()
         self.w = nn.Parameter(torch.randn(q_dim, s_dim) * 1e-3)
         self.out = nn.Linear(s_dim, out_dim)

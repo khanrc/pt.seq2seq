@@ -1,28 +1,31 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
-import data_prepare as dp
+from const import *
 
 
 class TranslationDataset(Dataset):
-    def __init__(self, input_lang, output_lang, pairs):
-        #input_lang, output_lang, pairs = dp.prepare_data('eng', 'fra', True)
+    def __init__(self, input_lang, output_lang, pairs, max_len):
         self.in_lang = input_lang
         self.out_lang = output_lang
         self.pairs = pairs
+        self.max_len = max_len
 
+    @classmethod
     def to_ids(self, s, lang):
-        return [lang.word2idx[token] for token in s.split(' ')]
+        return [lang.word2idx[token] if token in lang.word2idx else UNK_idx
+                for token in s.split(' ')]
 
     def __getitem__(self, index):
         pair = self.pairs[index]
 
-        ids1 = self.to_ids(pair[0], self.in_lang) + [dp.EOS_idx]
-        ids2 = self.to_ids(pair[1], self.out_lang) + [dp.EOS_idx]
+        ids1 = self.to_ids(pair[0], self.in_lang) + [EOS_idx]
+        ids2 = self.to_ids(pair[1], self.out_lang) + [EOS_idx]
         # assume that PAD_idx == 0
-        ids1_np = np.zeros(dp.MAX_LENGTH, dtype=np.long)
+        # +1 for EOS
+        ids1_np = np.zeros(self.max_len+1, dtype=np.long)
         ids1_np[:len(ids1)] = ids1
-        ids2_np = np.zeros(dp.MAX_LENGTH, dtype=np.long)
+        ids2_np = np.zeros(self.max_len+1, dtype=np.long)
         ids2_np[:len(ids2)] = ids2
 
         return (
