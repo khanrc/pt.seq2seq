@@ -3,12 +3,17 @@
 ## Run
 
 1. Download dataset from https://download.pytorch.org/tutorial/data.zip
-2. Prepare validation indices by `python data_prepare.py`
-3. Run: `python train.py`
+2. Run: `python train.py`
 
 Etc:
 
-- Hyperparams are in `train.py`.
+- Hyperparams are in `config.yaml`.
+
+## Dependencies
+
+- python3
+- pyyaml
+- pytorch
 
 ## Results
 
@@ -26,13 +31,14 @@ Models:
 
 ## ToDo
 
-- Torchtext
+- Torchtext?
 - Self-attention
 - Transformer
 - ConvS2S
 - Config
 - Add pre-trained word embeddings
 - Other dataset
+- Tensorboard
 
 ## References
 
