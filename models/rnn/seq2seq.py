@@ -1,4 +1,3 @@
-import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,15 +28,18 @@ class Seq2Seq(nn.Module):
         # decoder
         dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device=device)
         dec_h = context
-        use_teacher_forcing = random.random() < teacher_forcing
+        use_teacher_forcing = torch.rand(1).item() < teacher_forcing
         # [B, enc_len]
         # src_len == MAX_LENGTH, but we only need to enc_max_len (== enc_out.size(1))
-        enc_max_len = enc_out.size(1) # == max(src_lens)
+        #enc_max_len = enc_out.size(1) # == max(src_lens)
+        enc_max_len = src_lens.max()
         attn_mask = (src[:, :enc_max_len] != PAD_idx).unsqueeze_(1) # [B, 1, src_len]
         attn_ws = []
 
         if use_teacher_forcing:
             # Teacher forcing: Feed the target as the next input
+            # 체크: tgt 에 마지막껀 왜 빼지? EOS 일텐데. EOS 도 예측해야 하는거 아닌가?
+            # => EOS 가 입력으로 들어올 필욘 없다. 그 전에 끝남;
             dec_in = torch.cat([dec_in, tgt[:, :-1]], dim=1)
             # attn_w: [B, dec_len, enc_len]
             dec_outs, dec_h, attn_ws = self.decoder(dec_in, dec_h, enc_out, attn_mask)

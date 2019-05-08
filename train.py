@@ -6,38 +6,50 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Subset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 import numpy as np
 import yaml
 
 import utils
 from dataset import TranslationDataset, collate_data
-#from model import Encoder, Decoder, AttnDecoder, Seq2Seq
-from models.encdec import Encoder, AttnDecoder
-from models.seq2seq import Seq2Seq
+from models.rnn import Encoder, AttnDecoder, Seq2Seq
+from models.conv import ConvEncoder, ConvDecoder, ConvS2S
 from evaluate import random_eval, evaluateAndShowAttentions
 import data_prepare
 from lang import Lang
+from logger import Logger
 from const import *
 
 
-def train(loader, seq2seq, optimizer, criterion, teacher_forcing=0.5):
+logger = Logger.get()
+writer = SummaryWriter()
+
+
+def train(loader, seq2seq, optimizer, criterion, teacher_forcing, grad_clip, epoch):
     losses = utils.AverageMeter()
     seq2seq.train()
+    N = len(loader)
 
     for i, (src, src_lens, tgt, tgt_lens) in enumerate(loader):
         B = src.size(0)
         src = src.cuda()
         tgt = tgt.cuda()
 
+        #  if i == 0 and epoch == 0:
+        #      writer.add_graph(seq2seq, input_to_model=(src, src_lens, tgt, tgt_lens, 0.0), verbose=True)
+
         dec_outs, attn_ws = seq2seq(src, src_lens, tgt, tgt_lens, teacher_forcing)
 
         optimizer.zero_grad()
         loss = criterion(dec_outs, tgt)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(seq2seq.parameters(), grad_clip)
         optimizer.step()
 
         losses.update(loss, B)
+        cur_step = N*epoch + i
+        writer.add_scalar('train/loss', loss, cur_step)
 
     return losses.avg
 
@@ -79,28 +91,20 @@ def criterion(logits, targets):
 
 
 if __name__ == "__main__":
-    #  batch_size = 256
-    #  epochs = 10
-    #  h_dim = 1024 # encoder / decoder hidden dims
-    #  emb_dim = 300
-    #  bidirect = True
-    #  attention_type = 'mul'
-    #  VIZ_ATTN = True
-    #  N_eval = 3
-
     ## configuration
-    print("### Configuration ###")
+    logger.info("### Configuration ###")
     r = open("config.yaml").read()
-    print(r)
+    logger.nofmt(r)
     cfg = yaml.load(r, Loader=yaml.Loader)
     # train
     batch_size = cfg['train']['batch_size']
     epochs = cfg['train']['epochs']
+    teacher_forcing = cfg['train']['teacher_forcing']
+    grad_clip = cfg['train']['grad_clip']
     # model
-    h_dim = cfg['model']['h_dim']
-    emb_dim = cfg['model']['emb_dim']
-    bidirect = cfg['model']['bidirect']
-    attention_type = cfg['model']['attention_type']
+    model_type = cfg['model']['type']
+    h_dim = cfg['model']['args']['h_dim']
+    emb_dim = cfg['model']['args']['emb_dim']
     # eval
     N_eval = cfg['eval']['N']
     VIZ_ATTN = cfg['eval']['viz_attn']
@@ -109,7 +113,7 @@ if __name__ == "__main__":
     min_freq = cfg['data']['min_freq']
 
     # load dataset
-    print("### Load dataset ###")
+    logger.info("### Load dataset ###")
     in_lang_path = f"cache/in-fra-{max_len}-{min_freq}.pkl"
     out_lang_path = f"cache/out-eng-{max_len}-{min_freq}.pkl"
     pair_path = f"cache/fra2eng-{max_len}.pkl"
@@ -120,60 +124,101 @@ if __name__ == "__main__":
     input_lang = Lang.load_from_file("fra", in_lang_path)
     output_lang = Lang.load_from_file("eng", out_lang_path)
     pairs = pickle.load(open(pair_path, "rb"))
-    print("\tinput_lang.n_words = {}".format(input_lang.n_words))
-    print("\toutput_lang.n_words = {}".format(output_lang.n_words))
-    print("\t# of pairs = {}".format(len(pairs)))
+    logger.info("\tinput_lang.n_words = {}".format(input_lang.n_words))
+    logger.info("\toutput_lang.n_words = {}".format(output_lang.n_words))
+    logger.info("\t# of pairs = {}".format(len(pairs)))
     dset = TranslationDataset(input_lang, output_lang, pairs, max_len)
-    print(random.choice(pairs))
+    logger.info(random.choice(pairs))
 
     # split dset by valid indices
-    valid_indices = np.load("valid_indices.npy")
+    N_pairs = len(pairs)
+    val_indices_path = f"cache/valid_indices-{N_pairs}.npy"
+    if not os.path.exists(val_indices_path):
+        data_prepare.gen_valid_indices(N_pairs, 0.1, val_indices_path)
+    valid_indices = np.load(val_indices_path)
     train_indices = list(set(range(len(dset))) - set(valid_indices))
     train_dset = Subset(dset, train_indices)
     valid_dset = Subset(dset, valid_indices)
 
     # loader
-    print("Load loader")
-    train_loader = DataLoader(train_dset, batch_size, shuffle=True, num_workers=4, collate_fn=collate_data)
-    valid_loader = DataLoader(valid_dset, batch_size, shuffle=True, num_workers=4, collate_fn=collate_data)
+    logger.info("Load loader")
+    train_loader = DataLoader(train_dset, batch_size, shuffle=True, num_workers=4,
+                              collate_fn=collate_data)
+    valid_loader = DataLoader(valid_dset, batch_size, shuffle=False, num_workers=4,
+                              collate_fn=collate_data)
 
     # build model
-    print("### Build model ###")
-    encoder = Encoder(dset.in_lang.n_words, emb_dim, h_dim, bidirect=bidirect)
-    decoder = AttnDecoder(emb_dim, h_dim, dset.out_lang.n_words, enc_h_dim=encoder.h_dim*encoder.n_direct,
-                          attention=attention_type)
-    seq2seq = Seq2Seq(encoder, decoder, max_len)
+    logger.info("### Build model ###")
+    in_dim = dset.in_lang.n_words
+    out_dim = dset.out_lang.n_words
+    if model_type == 'rnn':
+        bidirect = cfg['model']['args']['bidirect']
+        attention_type = cfg['model']['args']['attention_type']
+
+        encoder = Encoder(in_dim, emb_dim, h_dim, bidirect=bidirect)
+        decoder = AttnDecoder(emb_dim, h_dim, out_dim, enc_h_dim=encoder.h_dim*encoder.n_direct,
+                              attention=attention_type)
+        seq2seq = Seq2Seq(encoder, decoder, max_len)
+    elif model_type == 'conv':
+        enc_layers = cfg['model']['args']['enc_layers']
+        dec_layers = cfg['model']['args']['dec_layers']
+        kernel_size = cfg['model']['args']['kernel_size']
+        dropout = cfg['model']['args']['dropout']
+
+        encoder = ConvEncoder(in_dim, emb_dim, h_dim, n_layers=enc_layers, kernel_size=kernel_size,
+                              dropout=dropout, max_len=max_len)
+        decoder = ConvDecoder(emb_dim, h_dim, out_dim, n_layers=dec_layers, kernel_size=kernel_size,
+                              dropout=dropout, max_len=max_len)
+        seq2seq = ConvS2S(encoder, decoder, max_len)
+
     seq2seq.cuda()
-    print(seq2seq)
+    logger.nofmt(seq2seq)
 
-    # batch size 1, epoch 8, lr 0.01 => val_loss 11.63
-    #optimizer = optim.SGD(seq2seq.parameters(), lr=0.01)
+    #  optimizer = optim.SGD(seq2seq.parameters(), lr=0.25)
+    #  lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, min_lr=1e-4,
+    #                                                      verbose=True)
 
-    # batch size 64, epoch 40 => val_loss 13.95 (min=13.5)
-    optimizer = optim.Adamax(seq2seq.parameters())
+    #optimizer = optim.Adamax(seq2seq.parameters())
 
-    #optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4)
+    optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4)
+    lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
-    #  print("Random eval:")
+    #  logger.info("Random eval:")
     #  random_eval(valid_dset, seq2seq)
     if VIZ_ATTN:
         utils.makedirs('evals')
         evaluateAndShowAttentions(seq2seq, dset.in_lang, dset.out_lang, epoch=0, print_attn=True)
-    #  print("")
+    #  logger.info("")
 
     best = 999.
     for epoch in range(epochs):
-        print("Epoch {}".format(epoch+1))
-        loss = train(train_loader, seq2seq, optimizer, criterion, teacher_forcing=0.5)
-        print("\ttrain: {}".format(loss))
-        loss = evaluate(valid_loader, seq2seq, criterion)
-        print("\tvalid: {}".format(loss))
+        logger.info("Epoch {}, LR = {}".format(epoch+1, optimizer.param_groups[0]["lr"]))
 
-        if loss < best:
-            best = loss
-        print("Random eval:")
+        # train
+        trn_loss = train(train_loader, seq2seq, optimizer, criterion, teacher_forcing=teacher_forcing,
+                     grad_clip=grad_clip, epoch=epoch)
+        logger.info("\ttrain: {}".format(trn_loss))
+
+        # validation
+        val_loss = evaluate(valid_loader, seq2seq, criterion)
+        logger.info("\tvalid: {}".format(val_loss))
+        cur_step = len(train_loader) * (epoch+1)
+        writer.add_scalar('val/loss', val_loss, cur_step)
+
+        if val_loss < best:
+            best = val_loss
+
+        # step lr scheduler
+        if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+            lr_scheduler.step(val_loss)
+        else:
+            lr_scheduler.step()
+
+        # evaluation & attention visualization
+        logger.info("Random eval:")
         random_eval(valid_dset, seq2seq, N=N_eval)
         if VIZ_ATTN:
             evaluateAndShowAttentions(seq2seq, dset.in_lang, dset.out_lang, epoch=epoch+1, print_attn=True)
-        print("")
-    print("Best loss = {}".format(best))
+        logger.info("")
+
+    logger.info("Best loss = {}".format(best))

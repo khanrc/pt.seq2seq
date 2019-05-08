@@ -1,4 +1,5 @@
 import unicodedata
+import os
 import re
 import random
 import numpy as np
@@ -11,15 +12,15 @@ from collections import Counter
 
 # 데이터셋에는 13만개의 eng-fra pair 가 있는데,
 # 이 튜토리얼에서는 아래의 prefix 로 시작하고, 최대 길이가 10 이하인 페어들만 사용한다.
-#MAX_LENGTH = 14
-#  eng_prefixes = (
-#      "i am ", "i m ",
-#      "he is", "he s ",
-#      "she is", "she s ",
-#      "you are", "you re ",
-#      "we are", "we re ",
-#      "they are", "they re "
-#  )
+#MAX_LENGTH = 10
+eng_prefixes = (
+    "i am ", "i m ",
+    "he is", "he s ",
+    "she is", "she s ",
+    "you are", "you re ",
+    "we are", "we re ",
+    "they are", "they re "
+)
 
 
 # unicode => ascii
@@ -83,7 +84,10 @@ def prepare(max_len, min_freq):
 
     # filter pairs
     pairs = filter(lambda p: filter_len(p, max_len), pairs)
-    #pairs = filter(filter_eng_prefix, pairs)
+    # max_len 이 10 이고 min_freq 가 0 이면 prefix 로 특수 필터링.
+    if max_len == 10 and min_freq == 0:
+        print("[!] Filter by prefix ...")
+        pairs = filter(filter_eng_prefix, pairs)
     pairs = list(pairs)
     print(f"Trimmed to {len(pairs)} sentece pairs")
 
@@ -99,13 +103,13 @@ def prepare(max_len, min_freq):
 
     print(f"Real max len = {mlen}")
 
-    print("Counted words: {}={}, {}={}", format(
+    print("Counted words: {}={}, {}={}".format(
         input_lang.name, input_lang.n_words, output_lang.name, output_lang.n_words))
 
     print(f"Cut by min_freq = {min_freq}:")
     input_lang.cut_freq(min_freq)
     output_lang.cut_freq(min_freq)
-    print("Counted words: {}={}, {}={}", format(
+    print("Counted words: {}={}, {}={}".format(
         input_lang.name, input_lang.n_words, output_lang.name, output_lang.n_words))
 
     print("Caching ... ")
@@ -127,11 +131,13 @@ def gen_valid_indices(N, ratio, path):
 
 
 if __name__ == "__main__":
-    input_lang, output_lang, pairs = prepare(max_len=14, min_freq=2)
+    max_len = 10
+    min_freq = 0
+    input_lang, output_lang, pairs = prepare(max_len, min_freq)
     print(random.choice(pairs))
 
     # gen validation indices
-    path = "valid_indices.npy"
+    N = len(pairs)
+    path = f"cache/valid_indices-{N}.npy"
     if not os.path.exists(path):
-        N = len(pairs)
         gen_valid_indices(N, 0.1, path)

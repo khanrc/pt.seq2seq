@@ -6,6 +6,10 @@ plt.switch_backend('agg')
 import matplotlib.ticker as ticker
 from dataset import TranslationDataset
 from const import *
+from logger import Logger
+
+
+logger = Logger.get()
 
 
 def idx2words(indices, lang):
@@ -37,10 +41,10 @@ def random_eval(dset, seq2seq, N=3):
         out_words = idx2words(topi.squeeze(), out_lang)
         out_sentence = ' '.join(out_words)
 
-        print("> {}".format(src_sentence))
-        print("= {}".format(tgt_sentence))
-        print("< {}".format(out_sentence))
-        print("")
+        logger.info("> {}".format(src_sentence))
+        logger.info("= {}".format(tgt_sentence))
+        logger.info("< {}".format(out_sentence))
+        logger.info("")
 
 
 def showAttention(input_sentence, output_words, attentions, file_path):
@@ -73,8 +77,8 @@ def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
     topi = dec_outs.topk(1)[1] # [1, max_len, 1]
     out_words = idx2words(topi.squeeze(), out_lang)
 
-    print('input =', in_s)
-    print('output =', ' '.join(out_words))
+    logger.info("input = {}".format(in_s))
+    logger.info("output = {}".format(' '.join(out_words)))
     attn_ws = attn_ws.squeeze().detach().cpu()[:len(out_words)]
     showAttention(in_s, out_words, attn_ws, out_file)
     return attn_ws
@@ -93,4 +97,4 @@ def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn):
         file_path = "evals/{:02d}-{}.png".format(epoch, i)
         attn_ws = esa(s, out_file=file_path)
         if print_attn:
-            print(attn_ws.numpy().round(1))
+            logger.nofmt(attn_ws.numpy().round(1))

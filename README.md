@@ -13,7 +13,9 @@ Etc:
 
 - python3
 - pyyaml
-- pytorch
+- pytorch >= 1.10
+- tensorboard >= 1.14
+    - `pip install tb-nightly future`
 
 ## Results
 
@@ -34,11 +36,12 @@ Models:
 - Torchtext?
 - Self-attention
 - Transformer
-- ConvS2S
-- Config
 - Add pre-trained word embeddings
 - Other dataset
-- Tensorboard
+- ETC
+    - TB model graph
+    - ConvS2S caching
+    - LightConv & DynamicConv
 
 ## References
 

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.attention import KeyValueAttention, AdditiveAttention, MultiplicativeAttention
+from .attention import KeyValueAttention, AdditiveAttention, MultiplicativeAttention
 from const import *
 
 
