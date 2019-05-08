@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from const import *
+from .encdec import Encoder, AttnDecoder
 
 
 device = torch.device('cuda')
@@ -12,10 +13,12 @@ class Seq2Seq(nn.Module):
         - vanilla seq2seq
         - seq2seq + attention
     """
-    def __init__(self, encoder, decoder, max_len):
+    def __init__(self, in_dim, emb_dim, h_dim, out_dim, enc_bidirect, attention, max_len):
         super().__init__()
-        self.encoder = encoder
-        self.decoder = decoder
+        self.encoder = Encoder(in_dim, emb_dim, h_dim, bidirect=enc_bidirect)
+        enc_h_dim = h_dim * self.encoder.n_direct
+        self.decoder = AttnDecoder(emb_dim, h_dim, out_dim, enc_h_dim=enc_h_dim,
+                                   attention=attention)
         self.max_len = max_len
 
     def forward(self, src, src_lens, tgt, tgt_lens, teacher_forcing):

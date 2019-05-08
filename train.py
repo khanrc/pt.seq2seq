@@ -13,8 +13,7 @@ import yaml
 
 import utils
 from dataset import TranslationDataset, collate_data
-from models.rnn import Encoder, AttnDecoder, Seq2Seq
-from models.conv import ConvEncoder, ConvDecoder, ConvS2S
+from models import Seq2Seq, ConvS2S
 from evaluate import random_eval, evaluateAndShowAttentions
 import data_prepare
 from lang import Lang
@@ -154,22 +153,15 @@ if __name__ == "__main__":
     if model_type == 'rnn':
         bidirect = cfg['model']['args']['bidirect']
         attention_type = cfg['model']['args']['attention_type']
-
-        encoder = Encoder(in_dim, emb_dim, h_dim, bidirect=bidirect)
-        decoder = AttnDecoder(emb_dim, h_dim, out_dim, enc_h_dim=encoder.h_dim*encoder.n_direct,
-                              attention=attention_type)
-        seq2seq = Seq2Seq(encoder, decoder, max_len)
+        seq2seq = Seq2Seq(in_dim, emb_dim, h_dim, out_dim, enc_bidirect=bidirect,
+                          attention=attention_type, max_len=max_len)
     elif model_type == 'conv':
         enc_layers = cfg['model']['args']['enc_layers']
         dec_layers = cfg['model']['args']['dec_layers']
         kernel_size = cfg['model']['args']['kernel_size']
         dropout = cfg['model']['args']['dropout']
-
-        encoder = ConvEncoder(in_dim, emb_dim, h_dim, n_layers=enc_layers, kernel_size=kernel_size,
-                              dropout=dropout, max_len=max_len)
-        decoder = ConvDecoder(emb_dim, h_dim, out_dim, n_layers=dec_layers, kernel_size=kernel_size,
-                              dropout=dropout, max_len=max_len)
-        seq2seq = ConvS2S(encoder, decoder, max_len)
+        seq2seq = ConvS2S(in_dim, emb_dim, h_dim, out_dim, enc_layers, dec_layers,
+                          kernel_size=kernel_size, dropout=dropout, max_len=max_len)
 
     seq2seq.cuda()
     logger.nofmt(seq2seq)
