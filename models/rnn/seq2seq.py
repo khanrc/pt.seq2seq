@@ -5,20 +5,19 @@ from const import *
 from .encdec import Encoder, AttnDecoder
 
 
-device = torch.device('cuda')
-
-
 class Seq2Seq(nn.Module):
     """ Seq2Seq model
         - vanilla seq2seq
         - seq2seq + attention
     """
-    def __init__(self, in_dim, emb_dim, h_dim, out_dim, enc_bidirect, attention, max_len):
+    def __init__(self, in_dim, emb_dim, h_dim, out_dim, enc_layers, dec_layers,
+                 enc_bidirect, attention, max_len, dropout):
         super().__init__()
-        self.encoder = Encoder(in_dim, emb_dim, h_dim, bidirect=enc_bidirect)
+        self.encoder = Encoder(in_dim, emb_dim, h_dim, enc_layers,
+                               bidirect=enc_bidirect, dropout=dropout)
         enc_h_dim = h_dim * self.encoder.n_direct
-        self.decoder = AttnDecoder(emb_dim, h_dim, out_dim, enc_h_dim=enc_h_dim,
-                                   attention=attention)
+        self.decoder = AttnDecoder(emb_dim, h_dim, out_dim, enc_h_dim, dec_layers,
+                                   attention=attention, dropout=dropout)
         self.max_len = max_len
 
     def forward(self, src, src_lens, tgt, tgt_lens, teacher_forcing):
@@ -29,7 +28,7 @@ class Seq2Seq(nn.Module):
         enc_out, context = self.encoder(src, src_lens)
 
         # decoder
-        dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device=device)
+        dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
         dec_h = context
         use_teacher_forcing = torch.rand(1).item() < teacher_forcing
         # [B, enc_len]

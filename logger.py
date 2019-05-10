@@ -7,8 +7,7 @@ import os
 class Logger(logging.Logger):
     NAME = 'ConvS2S'
 
-    def nofmt(self, msg, lvl=20, *args, **kwargs):
-        # need lock?
+    def nofmt(self, msg, lvl=logging.INFO, *args, **kwargs):
         formatters = self.remove_formats()
         r = super().log(lvl, msg, *args, **kwargs)
         self.set_formats(formatters)
@@ -35,15 +34,16 @@ class Logger(logging.Logger):
         self.addHandler(file_handler)
 
     @classmethod
-    def get(cls, file_path=None):
+    def get(cls, file_path=None, comment=None):
         logging.setLoggerClass(cls)
         logger = logging.getLogger(cls.NAME)
+        logging.setLoggerClass(logging.Logger) # restore
         if logger.hasHandlers():
             assert file_path is None
             return logger
 
         log_format = '%(asctime)s | %(message)s'
-        formatter = logging.Formatter(log_format, datefmt='%m/%d %H:%M:%S %p')
+        formatter = logging.Formatter(log_format, datefmt='%m/%d %H:%M:%S')
 
         # standard output handler
         stream_handler = logging.StreamHandler()
@@ -53,7 +53,10 @@ class Logger(logging.Logger):
         if file_path is None:
             # set default
             timestamp = datetime.now().strftime('%y%m%d_%H-%M-%S')
-            file_name = "{}.log".format(timestamp)
+            file_name = "{}".format(timestamp)
+            if comment:
+                file_name += "_{}".format(comment)
+            file_name += ".log"
             file_path = os.path.join("logs", file_name)
             utils.makedirs("logs")
 
@@ -63,5 +66,6 @@ class Logger(logging.Logger):
         logger.addHandler(file_handler)
 
         logger.setLevel(logging.INFO)
+        logger.propagate = False
 
         return logger

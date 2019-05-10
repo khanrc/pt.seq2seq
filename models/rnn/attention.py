@@ -42,7 +42,7 @@ class KeyValueAttention(nn.Module):
         """
         q: [B, q_len, q_in_dim]
         s: [B, src_len, kv_in_dim]
-        mask: [B, src_len]
+        mask: [B, 1, src_len]
         """
         q = self.q_proj(q) # [B, q_len, qk_dim]
         k = self.k_proj(s) # [B, src_len, qk_dim]

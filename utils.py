@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 
 class AverageMeter():
@@ -28,3 +29,13 @@ def makedirs(path):
         except OSError as exc:
             if exc.errno != errno.EEXIST:
                 raise
+
+
+def tb_name(comment):
+    """ Generate tensorboard run name
+    Just remove hostname from default.
+    """
+    cur_time = datetime.now().strftime('%b%d_%H-%M-%S')
+    name = "{}_{}".format(cur_time, comment)
+    log_dir = os.path.join('runs', name)
+    return log_dir

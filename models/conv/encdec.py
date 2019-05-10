@@ -88,13 +88,19 @@ class ConvDecoder(nn.Module):
         concat[-kernel_size:] 만 사용해서 conv inference 를 하면 됨.
         만약 T < kernel_size 인 경우 부족한 만큼 zero-padding.
     """
-    def __init__(self, emb_dim, h_dim, out_dim, n_layers, kernel_size, dropout, max_len):
+    def __init__(self, emb_dim, h_dim, out_dim, n_layers, kernel_size, dropout, max_len,
+                 cache_mode='in'):
+        """
+        params:
+            cache_mode: in / out. in 이면 논문 그대로고, out 이면 이전 타임스텝의 out 을 캐싱.
+        """
         super().__init__()
         self.emb_dim = emb_dim
         self.h_dim = h_dim
         self.out_dim = out_dim
         self.kernel_size = kernel_size
         self.n_layers = n_layers
+        self.cache_mode = cache_mode
 
         self.embedding = nn.Embedding(out_dim, emb_dim, padding_idx=PAD_idx)
         self.pos_embedding = nn.Embedding(max_len+2, emb_dim, padding_idx=PAD_idx)
@@ -142,6 +148,7 @@ class ConvDecoder(nn.Module):
             skip_con = out
             # dropout & future-masking by left-zero padding with caching
             out = self.dropout(out)
+            ### in-caching
             if cached is not None:
                 cache = cached[i] # conv inputs of just before timestep T-1
                 if timestep == 0: # first timestep => non-cached yet
@@ -165,6 +172,10 @@ class ConvDecoder(nn.Module):
             # residual
             out = (combine + skip_con) * self.scale # [B, h_dim, L]
             attn_ws.append(attn_w)
+
+            ### out-caching
+            if self.cache_mode == 'out' and cached is not None:
+                cached[i] = torch.cat([conv_in[:, :, :-1], out], dim=2)
 
         out = self.hid2emb(out.permute(0, 2, 1)) # [B, L, emb_dim]
         out = self.dropout(out)

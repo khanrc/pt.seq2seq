@@ -6,12 +6,13 @@ from .encdec import ConvEncoder, ConvDecoder
 
 class ConvS2S(nn.Module):
     def __init__(self, in_dim, emb_dim, h_dim, out_dim, enc_layers, dec_layers, kernel_size,
-                 dropout, max_len):
+                 dropout, max_len, cache_mode):
         super().__init__()
         self.encoder = ConvEncoder(in_dim, emb_dim, h_dim, n_layers=enc_layers,
                                    kernel_size=kernel_size, dropout=dropout, max_len=max_len)
         self.decoder = ConvDecoder(emb_dim, h_dim, out_dim, n_layers=dec_layers,
-                                   kernel_size=kernel_size, dropout=dropout, max_len=max_len)
+                                   kernel_size=kernel_size, dropout=dropout, max_len=max_len,
+                                   cache_mode=cache_mode)
         self.max_len = max_len
 
     def forward(self, src, src_lens, tgt, tgt_lens, teacher_forcing):

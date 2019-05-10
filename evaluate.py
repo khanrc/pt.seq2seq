@@ -1,9 +1,9 @@
+import random
 import torch
 import matplotlib.pyplot as plt
-from functools import partial
-import random
 plt.switch_backend('agg')
 import matplotlib.ticker as ticker
+import numpy as np
 from dataset import TranslationDataset
 from const import *
 from logger import Logger
@@ -47,7 +47,7 @@ def random_eval(dset, seq2seq, N=3):
         logger.info("")
 
 
-def showAttention(input_sentence, output_words, attentions, file_path):
+def showAttention(input_sentence, output_words, attentions, file_path=None):
     # Set up figure with colorbar
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -62,9 +62,14 @@ def showAttention(input_sentence, output_words, attentions, file_path):
     ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
-    #plt.show()
-    plt.savefig(file_path)
-    plt.close()
+    if file_path:
+        plt.savefig(file_path)
+        plt.close()
+    else:
+        fig.canvas.draw()
+        X = np.array(fig.canvas.renderer._renderer)
+        plt.close()
+        return X
 
 
 def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
@@ -80,13 +85,11 @@ def evaluateAndShowAttention(in_s, seq2seq, in_lang, out_lang, out_file):
     logger.info("input = {}".format(in_s))
     logger.info("output = {}".format(' '.join(out_words)))
     attn_ws = attn_ws.squeeze().detach().cpu()[:len(out_words)]
-    showAttention(in_s, out_words, attn_ws, out_file)
-    return attn_ws
+    image = showAttention(in_s, out_words, attn_ws, out_file)
+    return attn_ws, image
 
 
-def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn):
-    esa = partial(evaluateAndShowAttention, seq2seq=seq2seq, in_lang=in_lang,
-                  out_lang=out_lang)
+def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn, writer):
     sens = [
         "elle a cinq ans de moins que moi .",
         "elle est trop petit .",
@@ -94,7 +97,12 @@ def evaluateAndShowAttentions(seq2seq, in_lang, out_lang, epoch, print_attn):
         "c est un jeune directeur plein de talent ."
     ]
     for i, s in enumerate(sens):
-        file_path = "evals/{:02d}-{}.png".format(epoch, i)
-        attn_ws = esa(s, out_file=file_path)
+        #file_path = "evals/{:02d}-{}.png".format(epoch, i)
+        attn_ws, image = evaluateAndShowAttention(s, seq2seq, in_lang, out_lang, out_file=None)
+        """ tag regex: [^-\w\.] substitute to _
+        즉, -_. + alphanumeric 만 가능.
+        """
+        tag = "{}--{}".format(i, s)
+        writer.add_image(tag, image, global_step=epoch, dataformats='HWC')
         if print_attn:
             logger.nofmt(attn_ws.numpy().round(1))
