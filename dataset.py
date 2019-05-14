@@ -37,7 +37,7 @@ class TranslationDataset(Dataset):
         return len(self.pairs)
 
 
-def collate_data(batch):
+def src_sort(batch):
     batch.sort(key=lambda b: b[1], reverse=True)
     return [torch.stack(b) for b in zip(*batch)]
 

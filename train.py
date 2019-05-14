@@ -11,11 +11,12 @@ from torch.utils.data import Subset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim as optim
 import numpy as np
-import yaml
+from yaml_config import YAMLConfig
+from warmup import WarmupLR
 
 import utils
-from dataset import TranslationDataset, collate_data
-from models import Seq2Seq, ConvS2S
+from dataset import TranslationDataset, src_sort
+from models import Seq2Seq, ConvS2S, Transformer
 from evaluate import random_eval, evaluateAndShowAttentions
 import data_prepare
 from lang import Lang
@@ -24,23 +25,30 @@ from const import *
 
 
 ### Load config, logger, and tb writer
+# arg parser
 parser = argparse.ArgumentParser("ConvS2S")
 parser.add_argument("config_path")
 parser.add_argument("name")
-args = parser.parse_args()
+args, left_argv = parser.parse_known_args()
 if not args.config_path.endswith(".yaml"):
     args.config_path += ".yaml"
 
-# logger
-logger = Logger.get(comment=args.name)
-# tb
-tb_path = utils.tb_name(args.name)
-writer = SummaryWriter(log_dir=tb_path)
+# prepare
+timestamp = utils.timestamp()
+utils.makedirs('logs')
+utils.makedirs('runs')
 # config
-cfg = yaml.load(open(args.config_path), Loader=yaml.Loader)
+cfg = YAMLConfig(args.config_path, left_argv)
+# logger
+logger_path = os.path.join('logs', "{}_{}.log".format(timestamp, args.name))
+logger = Logger.get(file_path=logger_path)
+# tb
+tb_path = os.path.join('runs', "{}_{}".format(timestamp, args.name))
+writer = SummaryWriter(log_dir=tb_path)
 
 
-def train(loader, seq2seq, optimizer, criterion, teacher_forcing, grad_clip, epoch):
+def train(loader, seq2seq, optimizer, lr_scheduler, criterion, teacher_forcing, epoch,
+          grad_clip=0.):
     losses = utils.AverageMeter()
     ppls = utils.AverageMeter()
     seq2seq.train()
@@ -59,7 +67,8 @@ def train(loader, seq2seq, optimizer, criterion, teacher_forcing, grad_clip, epo
         optimizer.zero_grad()
         loss, ppl = criterion(dec_outs, tgt)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(seq2seq.parameters(), grad_clip)
+        if grad_clip > 0.:
+            torch.nn.utils.clip_grad_norm_(seq2seq.parameters(), grad_clip)
         optimizer.step()
 
         losses.update(loss, B)
@@ -67,6 +76,12 @@ def train(loader, seq2seq, optimizer, criterion, teacher_forcing, grad_clip, epo
         cur_step = N*epoch + i
         writer.add_scalar('train/loss', loss, cur_step)
         writer.add_scalar('train/ppl', ppl, cur_step)
+
+        # step lr scheduler
+        if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+            lr_scheduler.step(val_loss)
+        else:
+            lr_scheduler.step()
 
     return losses.avg, ppls.avg
 
@@ -116,11 +131,8 @@ def criterion(logits, targets):
 if __name__ == "__main__":
     ## configuration
     logger.info("### Configuration ###")
-    cfg_str = yaml.dump(cfg, sort_keys=False)
-    logger.nofmt(cfg_str)
-
-    cfg_str_mk = cfg_str.replace(' ', '&nbsp;').replace('\n', '  \n')
-    writer.add_text("config", cfg_str_mk)
+    logger.nofmt(cfg.str())
+    writer.add_text("config", cfg.markdown())
     # train
     batch_size = cfg['train']['batch_size']
     epochs = cfg['train']['epochs']
@@ -128,8 +140,6 @@ if __name__ == "__main__":
     grad_clip = cfg['train']['grad_clip']
     # model
     model_type = cfg['model']['type']
-    h_dim = cfg['model']['h_dim']
-    emb_dim = cfg['model']['emb_dim']
     # eval
     N_eval = cfg['eval']['N']
     VIZ_ATTN = cfg['eval']['viz_attn']
@@ -166,34 +176,49 @@ if __name__ == "__main__":
     valid_dset = Subset(dset, valid_indices)
 
     # loader
+    collate_fn = src_sort if model_type == 'rnn' else torch.utils.data.dataloader.default_collate
     logger.info("Load loader")
     train_loader = DataLoader(train_dset, batch_size, shuffle=True, num_workers=4,
-                              collate_fn=collate_data)
+                              collate_fn=collate_fn)
     valid_loader = DataLoader(valid_dset, batch_size, shuffle=False, num_workers=4,
-                              collate_fn=collate_data)
+                              collate_fn=collate_fn)
 
     # build model
     logger.info("### Build model ###")
     in_dim = dset.in_lang.n_words
     out_dim = dset.out_lang.n_words
+    mcfg = cfg['model']
     if model_type == 'rnn':
-        bidirect = cfg['model']['bidirect']
-        attention_type = cfg['model']['attention_type']
-        dropout = cfg['model']['dropout']
-        enc_layers = cfg['model']['enc_layers']
-        dec_layers = cfg['model']['dec_layers']
+        h_dim = mcfg['h_dim']
+        emb_dim = mcfg['emb_dim']
+        bidirect = mcfg['bidirect']
+        attention_type = mcfg['attention_type']
+        dropout = mcfg['dropout']
+        enc_layers = mcfg['enc_layers']
+        dec_layers = mcfg['dec_layers']
         seq2seq = Seq2Seq(in_dim, emb_dim, h_dim, out_dim, enc_layers, dec_layers,
                           enc_bidirect=bidirect, dropout=dropout,
                           attention=attention_type, max_len=max_len)
     elif model_type == 'conv':
-        enc_layers = cfg['model']['enc_layers']
-        dec_layers = cfg['model']['dec_layers']
-        kernel_size = cfg['model']['kernel_size']
-        dropout = cfg['model']['dropout']
-        cache_mode = cfg['model']['cache_mode']
+        h_dim = mcfg['h_dim']
+        emb_dim = mcfg['emb_dim']
+        enc_layers = mcfg['enc_layers']
+        dec_layers = mcfg['dec_layers']
+        kernel_size = mcfg['kernel_size']
+        dropout = mcfg['dropout']
+        cache_mode = mcfg['cache_mode']
         seq2seq = ConvS2S(in_dim, emb_dim, h_dim, out_dim, enc_layers, dec_layers,
                           kernel_size=kernel_size, dropout=dropout, max_len=max_len,
                           cache_mode=cache_mode)
+    elif model_type == 'transformer':
+        d_model = mcfg['d_model']
+        d_ff = mcfg['d_ff']
+        n_layers = mcfg['n_layers']
+        n_heads = mcfg['n_heads']
+        dropout = mcfg['dropout']
+        norm_pos = mcfg['norm_pos']
+        seq2seq = Transformer(in_dim, out_dim, max_len, d_model, d_ff, n_layers, n_heads, dropout,
+                              norm_pos)
 
     seq2seq.cuda()
     logger.nofmt(seq2seq)
@@ -204,16 +229,19 @@ if __name__ == "__main__":
 
     #optimizer = optim.Adamax(seq2seq.parameters())
 
+    T_ep = len(train_loader)
+    #optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4, betas=(0.9, 0.98), eps=1e-9)
     optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4)
-    lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=3e-6)
+    lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=T_ep*epochs, eta_min=3e-6)
+    if 'warmup_epoch' in cfg['train']:
+        warmup_ep = cfg['train']['warmup_epoch']
+        lr_scheduler = WarmupLR(optimizer, init_scale=1e-3, T_max=T_ep*warmup_ep,
+                                after=lr_scheduler)
 
-    #  logger.info("Random eval:")
-    #  random_eval(valid_dset, seq2seq)
     if VIZ_ATTN:
         utils.makedirs('evals')
         evaluateAndShowAttentions(seq2seq, dset.in_lang, dset.out_lang, epoch=0, print_attn=True,
                                   writer=writer)
-    #  logger.info("")
 
     best_ppl = 999.
     best_loss = 999.
@@ -221,13 +249,14 @@ if __name__ == "__main__":
         logger.info("Epoch {}, LR = {}".format(epoch+1, optimizer.param_groups[0]["lr"]))
 
         # train
-        trn_loss, trn_ppl = train(train_loader, seq2seq, optimizer, criterion,
-                                  teacher_forcing=teacher_forcing, grad_clip=grad_clip, epoch=epoch)
+        trn_loss, trn_ppl = train(train_loader, seq2seq, optimizer, lr_scheduler, criterion,
+                                  teacher_forcing=teacher_forcing, epoch=epoch, grad_clip=grad_clip)
         logger.info("\ttrain: Loss {:7.3f}  PPL {:7.3f}".format(trn_loss, trn_ppl))
 
         # validation
         val_loss, val_ppl = evaluate(valid_loader, seq2seq, criterion)
         logger.info("\tvalid: Loss {:7.3f}  PPL {:7.3f}".format(val_loss, val_ppl))
+
         cur_step = len(train_loader) * (epoch+1)
         writer.add_scalar('val/loss', val_loss, cur_step)
         writer.add_scalar('val/ppl', val_ppl, cur_step)
@@ -235,12 +264,6 @@ if __name__ == "__main__":
         if val_ppl < best_ppl:
             best_ppl = val_ppl
             best_loss = val_loss
-
-        # step lr scheduler
-        if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-            lr_scheduler.step(val_loss)
-        else:
-            lr_scheduler.step()
 
         # evaluation & attention visualization
         logger.info("Random eval:")

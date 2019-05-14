@@ -34,13 +34,13 @@ class Logger(logging.Logger):
         self.addHandler(file_handler)
 
     @classmethod
-    def get(cls, file_path=None, comment=None):
+    def get(cls, file_path=None):
         logging.setLoggerClass(cls)
         logger = logging.getLogger(cls.NAME)
         logging.setLoggerClass(logging.Logger) # restore
+
         if logger.hasHandlers():
-            assert file_path is None
-            return logger
+            logger.handlers.clear()
 
         log_format = '%(asctime)s | %(message)s'
         formatter = logging.Formatter(log_format, datefmt='%m/%d %H:%M:%S')
@@ -50,20 +50,11 @@ class Logger(logging.Logger):
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
 
-        if file_path is None:
-            # set default
-            timestamp = datetime.now().strftime('%y%m%d_%H-%M-%S')
-            file_name = "{}".format(timestamp)
-            if comment:
-                file_name += "_{}".format(comment)
-            file_name += ".log"
-            file_path = os.path.join("logs", file_name)
-            utils.makedirs("logs")
-
-        # file output handler
-        file_handler = logging.FileHandler(file_path)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        if file_path:
+            # file output handler
+            file_handler = logging.FileHandler(file_path)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
 
         logger.setLevel(logging.INFO)
         logger.propagate = False

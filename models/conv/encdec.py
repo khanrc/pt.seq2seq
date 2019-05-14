@@ -64,9 +64,7 @@ class ConvEncoder(nn.Module):
 
         for conv in self.convs:
             skip_con = out
-            # decoder 는 masking 이 필요 없음
-            # padding 은 어차피 뒤쪽에 붙는데 decoder 는 뒤쪽을 참조하지 않음
-            #out = out.masked_fill(mask.unsqueeze(1) == 0, 0.)
+            out = out.masked_fill(mask.unsqueeze(1) == 0, 0.)
             out = conv(self.dropout(out)) # [B, h_dim*2, L]
             out = F.glu(out, dim=1) # [B, h_dim, L]
             # residual connection
@@ -153,7 +151,7 @@ class ConvDecoder(nn.Module):
                 cache = cached[i] # conv inputs of just before timestep T-1
                 if timestep == 0: # first timestep => non-cached yet
                     assert cache.size(2) == 0
-                    conv_in = F.pad(out, [self.kernel_size-1, 0])
+                    conv_in = F.pad(out, [self.kernel_size-1, 0]) # future-masking
                 else:
                     assert cache.size(2) == self.kernel_size
                     conv_in = torch.cat([cache[:, :, 1:], out], dim=2) # [B, h_dim, kernel_size]

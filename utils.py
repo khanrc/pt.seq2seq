@@ -31,11 +31,15 @@ def makedirs(path):
                 raise
 
 
-def tb_name(comment):
-    """ Generate tensorboard run name
-    Just remove hostname from default.
-    """
-    cur_time = datetime.now().strftime('%b%d_%H-%M-%S')
-    name = "{}_{}".format(cur_time, comment)
-    log_dir = os.path.join('runs', name)
-    return log_dir
+def timestamp(fmt="%y%m%d_%H-%M-%S"):
+    return datetime.now().strftime(fmt)
+
+
+#  def tb_name(comment):
+#      """ Generate tensorboard run name
+#      Just remove hostname from default.
+#      """
+#      cur_time = datetime.now().strftime('%b%d_%H-%M-%S')
+#      name = "{}_{}".format(cur_time, comment)
+#      log_dir = os.path.join('runs', name)
+#      return log_dir

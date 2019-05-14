@@ -26,11 +26,11 @@ class ConvS2S(nn.Module):
         use_teacher_forcing = torch.rand(1).item() < teacher_forcing
         dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
         if use_teacher_forcing:
-            # [B, tgt_len, out_dim], [B, tgt_len, src_len]
             # Convert tgt to dec_in: SOS 추가 / EOS 제거.
             # EOS 를 제거하지 않는다고 문제가 생기는 것은 아님. 단지 할 필요가 없을 뿐.
             # 어차피 해도 gt 가 pad 이므로 로스를 먹지 않음.
             dec_in = torch.cat([dec_in, tgt[:, :-1]], dim=1)
+            # [B, tgt_len, out_dim], [B, tgt_len, src_len]
             dec_outs, attn_ws, _ = self.decoder(dec_in, enc_out, attn_value, enc_mask)
         else:
             dec_outs = []

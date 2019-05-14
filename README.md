@@ -34,11 +34,13 @@ Models:
 | Seq2Seq + Additive attn       | 13.28 | 5.054 | |
 | Seq2Seq + Multiplicative attn | 14.01 | 5.526 | |
 | SelfAttnS2S                   | | | Skip |
-| ConvS2S                       | 13.09 | 4.951 | |
-| ConvS2S + out-caching         | 12.53 | 4.629 | |
-| Transformer                   | | | |
+| ConvS2S                       | 12.97 | 4.876 | |
+| ConvS2S + out-caching         | 12.59 | 4.657 | |
+| Transformer                   | 13.79 | 5.400 | something wrong? |
 | LightConv                     | | | |
 | DynamicConv                   | | | |
+
+- Gradual Warmup does not helps
 
 ## ToDo
 
@@ -47,6 +49,9 @@ Models:
 - Transformer
 - Add pre-trained word embeddings
 - Other dataset
+- Word tokenization
+    - BPE
+    - Word piece model
 - ETC
     - TB model graph
     - LightConv & DynamicConv
