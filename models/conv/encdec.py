@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils import weight_norm
 from .attention import ConvS2SAttention
 from const import *
 
@@ -31,15 +32,15 @@ class ConvEncoder(nn.Module):
         self.pos_embedding = nn.Embedding(max_len+2, emb_dim, padding_idx=PAD_idx)
 
         # embedding => conv input dim (= h_dim)
-        self.emb2hid = nn.Linear(emb_dim, h_dim)
+        self.emb2hid = weight_norm(nn.Linear(emb_dim, h_dim))
         # conv output => emb dim
-        self.hid2emb = nn.Linear(h_dim, emb_dim)
+        self.hid2emb = weight_norm(nn.Linear(h_dim, emb_dim))
 
         # Conv1d: [N, C, L]
         self.convs = nn.ModuleList()
         padding = (kernel_size - 1) // 2
         for i in range(n_layers):
-            conv = nn.Conv1d(h_dim, 2*h_dim, kernel_size=kernel_size, padding=padding)
+            conv = weight_norm(nn.Conv1d(h_dim, 2*h_dim, kernel_size=kernel_size, padding=padding))
             self.convs.append(conv)
 
         self.dropout = nn.Dropout(dropout)
@@ -103,21 +104,21 @@ class ConvDecoder(nn.Module):
         self.embedding = nn.Embedding(out_dim, emb_dim, padding_idx=PAD_idx)
         self.pos_embedding = nn.Embedding(max_len+2, emb_dim, padding_idx=PAD_idx)
 
-        self.emb2hid = nn.Linear(emb_dim, h_dim)
-        self.hid2emb = nn.Linear(h_dim, emb_dim)
+        self.emb2hid = weight_norm(nn.Linear(emb_dim, h_dim))
+        self.hid2emb = weight_norm(nn.Linear(h_dim, emb_dim))
 
         # Conv1d: [N, C, L]
         self.layers = nn.ModuleList()
         for i in range(n_layers):
             # padding = 0
-            conv = nn.Conv1d(h_dim, 2*h_dim, kernel_size=kernel_size)
+            conv = weight_norm(nn.Conv1d(h_dim, 2*h_dim, kernel_size=kernel_size))
             attention = ConvS2SAttention(emb_dim, h_dim)
             self.layers.append(nn.ModuleList([conv, attention]))
 
         self.dropout = nn.Dropout(dropout)
         self.scale = 0.5 ** 0.5
 
-        self.readout = nn.Linear(emb_dim, out_dim)
+        self.readout = weight_norm(nn.Linear(emb_dim, out_dim))
 
     def forward(self, tgt, enc_out, attn_value, enc_mask, cached=None, timestep=0):
         """

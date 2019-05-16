@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils import weight_norm
 
 
 class ConvS2SAttention(nn.Module):
@@ -9,8 +10,8 @@ class ConvS2SAttention(nn.Module):
         """
         ConvS2S attention 은 residual 을 계산함
         """
-        self.q_proj = nn.Linear(h_dim, emb_dim)
-        self.out = nn.Linear(emb_dim, h_dim)
+        self.q_proj = weight_norm(nn.Linear(h_dim, emb_dim))
+        self.out = weight_norm(nn.Linear(emb_dim, h_dim))
         self.scale = 0.5 ** 0.5
 
     def forward(self, x, emb, key, value, kv_mask):
