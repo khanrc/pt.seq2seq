@@ -16,7 +16,7 @@ from warmup import WarmupLR
 
 import utils
 from dataset import TranslationDataset, src_sort
-from models import Seq2Seq, ConvS2S, Transformer
+from models import Seq2Seq, ConvS2S, Transformer, DynamicConvS2S
 from evaluate import random_eval, evaluateAndShowAttentions
 import data_prepare
 from lang import Lang
@@ -219,6 +219,16 @@ if __name__ == "__main__":
         norm_pos = mcfg['norm_pos']
         seq2seq = Transformer(in_dim, out_dim, max_len, d_model, d_ff, n_layers, n_heads, dropout,
                               norm_pos)
+    elif model_type == 'dynamic_conv':
+        conv_type = mcfg['conv_type']
+        kernel_sizes = mcfg['kernel_sizes']
+        d_model = mcfg['d_model']
+        d_ff = mcfg['d_ff']
+        n_heads = mcfg['n_heads']
+        dropout = mcfg['dropout']
+        norm_pos = mcfg['norm_pos']
+        seq2seq = DynamicConvS2S(in_dim, out_dim, max_len, conv_type, kernel_sizes, d_model, d_ff,
+                                 n_heads, dropout, norm_pos)
 
     seq2seq.cuda()
     logger.nofmt(seq2seq)
