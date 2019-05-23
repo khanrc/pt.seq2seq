@@ -47,7 +47,8 @@ class Seq2Seq(nn.Module):
             dec_outs, dec_h, attn_ws = self.decoder(dec_in, dec_h, enc_out, attn_mask)
         else:
             # Without Teacher forcing: use its own predictions as the next input
-            dec_max_len = tgt_lens.max() if tgt_lens is not None else self.max_len
+            # tgt_lens 에는 EOS 가 포함되어 있으나, max_len 에는 포함이 안되어 있어서 +1.
+            dec_max_len = tgt_lens.max() if tgt_lens is not None else self.max_len+1
             dec_outs = []
             for i in range(dec_max_len):
                 # [B, 1, out_lang.n_words], [1, B, h_dim], [B, 1, enc_len]

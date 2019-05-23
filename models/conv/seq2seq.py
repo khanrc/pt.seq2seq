@@ -38,7 +38,7 @@ class ConvS2S(nn.Module):
             # cache is similar to hidden state of RNN.
             caches = [torch.empty([B, self.decoder.h_dim, 0], dtype=torch.float32, device='cuda')
                       for _ in range(self.decoder.n_layers)]
-            for i in range(self.max_len):
+            for i in range(self.max_len+1):
                 # [B, cur_len, out_dim], [B, cur_len, src_len]
                 dec_out, attn_w, caches = self.decoder(
                     dec_in, enc_out, attn_value, enc_mask, caches, timestep=i)

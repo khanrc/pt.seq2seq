@@ -4,6 +4,15 @@ import utils
 import os
 
 
+log_lv = {
+    'critical': logging.CRITICAL,
+    'error': logging.ERROR,
+    'warning': logging.WARNING,
+    'info': logging.INFO,
+    'debug': logging.DEBUG
+}
+
+
 class Logger(logging.Logger):
     NAME = 'ConvS2S'
 
@@ -34,7 +43,7 @@ class Logger(logging.Logger):
         self.addHandler(file_handler)
 
     @classmethod
-    def get(cls, file_path=None):
+    def get(cls, file_path=None, level='info'):
         logging.setLoggerClass(cls)
         logger = logging.getLogger(cls.NAME)
         logging.setLoggerClass(logging.Logger) # restore
@@ -42,7 +51,7 @@ class Logger(logging.Logger):
         if logger.hasHandlers():
             logger.handlers.clear()
 
-        log_format = '%(asctime)s | %(message)s'
+        log_format = '%(levelname)s::%(asctime)s | %(message)s'
         formatter = logging.Formatter(log_format, datefmt='%m/%d %H:%M:%S')
 
         # standard output handler
@@ -56,7 +65,7 @@ class Logger(logging.Logger):
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
 
-        logger.setLevel(logging.INFO)
+        logger.setLevel(log_lv[level])
         logger.propagate = False
 
         return logger

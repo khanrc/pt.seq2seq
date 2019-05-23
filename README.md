@@ -37,6 +37,7 @@ Models:
 | ConvS2S                       | 13.06 | 4.931 | |
 | ConvS2S + out-caching         | 12.44 | 4.572 | |
 | Transformer                   | 13.79 | 5.400 | something wrong? |
+| Transformer-Big               | 16.14 | 7.203 | |
 | LightConv                     | 12.29 | 4.493 | K=[3,3,5,5,7,7] |
 | DynamicConv                   | 11.81 | 4.237 | K=[3,3,5,5,7,7] |
 | AAN (Averaged Attention)      | | | |
@@ -45,18 +46,14 @@ Models:
 
 ## ToDo
 
-- Torchtext?
-- Self-attention
-- Transformer
-- Add pre-trained word embeddings
-- Other dataset
-- BLEU
+- Torchtext
+    - Other dataset
+- Beam search
+- Add pre-trained word embeddings?
 - Word tokenization
     - BPE
     - Word piece model
-- ETC
-    - TB model graph
-    - LightConv & DynamicConv
+- AAN?
 
 ## References
 

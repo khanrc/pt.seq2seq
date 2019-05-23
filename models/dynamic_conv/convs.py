@@ -82,8 +82,19 @@ class DynamicConv1d(nn.Module):
     즉, data point 별로 time-dependent 한 kernel 을 구할 수 있음.
 
     그러면 weight sharing 이 없기 때문에 기존의 conv1d 를 사용할 수가 없으므로,
-    conv 연산을 직접 구현한다.
-    unfold 방식이 conventional 이라고 함.
+    conv 연산을 직접 구현한다. conv 를 matrix multiplication (MM) 으로 표현해야
+    효율적 계산이 가능하다.  두 가지 방법이 있는데:
+    1) input unfolding
+        input 을 conv 연산에 맞도록 window 간에 겹치는 부분을 카피해서
+        MM이 가능하도록 해주는 방식.
+    2) weight expanding (padding)
+        conv 가 MM 으로 계산이 안되는 이유는 local MM 이기 때문이므로,
+        나머지 부분을 그냥 0으로 채워서 band matrix 형태로 바꾸어
+        MM 으로 연산이 가능하도록 변경.
+
+    unfold 방식이 conventional 이라고 하여 여기서는 unfold 방식으로 구현.
+    expand 방식이 short sequence 에서는 더 빠르되, memory inefficient 라서 decoding 시에는
+    expand 방식이 더 좋다고 함.
     """
     def __init__(self, n_channels, kernel_size, stride=1, padding=(0, 0), n_heads=1, bias=True,
                  dropconnect=0.):

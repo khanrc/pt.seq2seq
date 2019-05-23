@@ -22,13 +22,16 @@ import data_prepare
 from lang import Lang
 from logger import Logger
 from const import *
+from bleu import BLEU
 
 
-### Load config, logger, and tb writer
+### Setup: load config, logger, and tb writer ###
 # arg parser
-parser = argparse.ArgumentParser("ConvS2S")
+parser = argparse.ArgumentParser("Seq2Seq")
 parser.add_argument("config_path")
 parser.add_argument("name")
+parser.add_argument("--param_tracing", action="store_true", default=False)
+parser.add_argument("--log_lv", default="info")
 args, left_argv = parser.parse_known_args()
 if not args.config_path.endswith(".yaml"):
     args.config_path += ".yaml"
@@ -41,7 +44,7 @@ utils.makedirs('runs')
 cfg = YAMLConfig(args.config_path, left_argv)
 # logger
 logger_path = os.path.join('logs', "{}_{}.log".format(timestamp, args.name))
-logger = Logger.get(file_path=logger_path)
+logger = Logger.get(file_path=logger_path, level=args.log_lv)
 # tb
 tb_path = os.path.join('runs', "{}_{}".format(timestamp, args.name))
 writer = SummaryWriter(log_dir=tb_path)
@@ -86,10 +89,35 @@ def train(loader, seq2seq, optimizer, lr_scheduler, criterion, teacher_forcing, 
     return losses.avg, ppls.avg
 
 
-def evaluate(loader, seq2seq, criterion):
+def evaluate(loader, seq2seq, criterion, max_len):
+    import time
     losses = utils.AverageMeter()
     ppls = utils.AverageMeter()
     seq2seq.eval()
+    bleu = BLEU()
+
+    tot_st = time.time()
+    bleu_time = 0.
+    # BLEU time: 13k 개에 대해서 약 4s. multi-cpu parallelization 은 가능함.
+
+    def get_lens(tensor, max_len=max_len):
+        """ get first position (index) of EOS_idx in tensor
+            = length of each sentence
+        tensor: [B, T]
+        """
+        # assume that former idx coming earlier in nonzero().
+        # tensor 가 [B, T] 이므로 nonzero 함수도 [i, j] 형태의 tuple 을 결과로 내놓는데,
+        # 이 결과가 i => j 순으로 sorting 되어 있다고 가정.
+        # e.g) nonzero() => [[1,1], [1,2], [2,1], [2,3], [2,5], ...]
+        nz = (tensor == EOS_idx).nonzero()
+        is_first = nz[:-1, 0] != nz[1:, 0]
+        is_first = torch.cat([torch.cuda.ByteTensor([1]), is_first]) # first mask
+
+        # convert is_first from mask to indice by nonzero()
+        first_nz = nz[is_first.nonzero().flatten()]
+        lens = torch.full([tensor.size(0)], max_len, dtype=torch.long).cuda()
+        lens[first_nz[:, 0]] = first_nz[:, 1]
+        return lens
 
     with torch.no_grad():
         for i, (src, src_lens, tgt, tgt_lens) in enumerate(loader):
@@ -102,7 +130,23 @@ def evaluate(loader, seq2seq, criterion):
             losses.update(loss, B)
             ppls.update(ppl, B)
 
-    return losses.avg, ppls.avg
+            # BLEU
+            bleu_st = time.time()
+            # convert logits to preds
+            preds = dec_outs.max(-1)[1]
+            # get pred lens by finding EOS token
+            pred_lens = get_lens(preds)
+
+            for pred, target, pred_len, target_len in zip(preds, tgt, pred_lens, tgt_lens):
+                # target_len include EOS token => -1.
+                bleu.add_sentence(pred[:pred_len].cpu().numpy(), target[:target_len-1].cpu().numpy())
+
+            bleu_time += time.time() - bleu_st
+    total_time = time.time() - tot_st
+
+    logger.debug("TIME: tot = {:.3f}\t bleu = {:.3f}".format(total_time, bleu_time))
+
+    return losses.avg, ppls.avg, bleu.score()
 
 
 def criterion(logits, targets):
@@ -231,7 +275,40 @@ if __name__ == "__main__":
                                  n_heads, dropout, norm_pos)
 
     seq2seq.cuda()
+    K = 1024
+    n_params = utils.num_params(seq2seq) / K / K
     logger.nofmt(seq2seq)
+    logger.info("# of params = {:.1f} M".format(n_params))
+
+    # parameter size tracing
+    if args.param_tracing:
+        # sequential tracing
+        #  for name, p in seq2seq.named_parameters():
+        #      numel = p.numel()
+        #      unit = 'M'
+        #      numel /= 1024*1024
+        #      fmt = "10.3f" if numel < 1.0 else "10.1f"
+
+        #      print("{:50s}\t{:{fmt}}{}".format(name, numel, unit, fmt=fmt))
+
+        # recursive tracing
+        def param_trace(name, module, depth, max_depth=999, threshold=0):
+            if depth > max_depth:
+                return
+            prefix = "  " * depth
+            n_params = utils.num_params(module)
+            if n_params > threshold:
+                print("{:60s}\t{:10.2f}M".format(prefix + name, n_params / K / K))
+            for n, m in module.named_children():
+                if depth == 0:
+                    child_name = n
+                else:
+                    child_name = "{}.{}".format(name, n)
+                param_trace(child_name, m, depth+1, max_depth, threshold)
+
+        param_trace('seq2seq', seq2seq, 0, max_depth=5, threshold=K*100)
+
+        exit()
 
     #  optimizer = optim.SGD(seq2seq.parameters(), lr=0.25)
     #  lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, min_lr=1e-4,
@@ -243,8 +320,8 @@ if __name__ == "__main__":
     #optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4, betas=(0.9, 0.98), eps=1e-9)
     optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4)
     lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=T_ep*epochs, eta_min=3e-6)
-    if 'warmup_epoch' in cfg['train']:
-        warmup_ep = cfg['train']['warmup_epoch']
+    if 'warmup' in cfg['train']:
+        warmup_ep = cfg['train']['warmup']
         lr_scheduler = WarmupLR(optimizer, init_scale=1e-3, T_max=T_ep*warmup_ep,
                                 after=lr_scheduler)
 
@@ -253,10 +330,11 @@ if __name__ == "__main__":
         evaluateAndShowAttentions(seq2seq, dset.in_lang, dset.out_lang, epoch=0, print_attn=True,
                                   writer=writer)
 
-    best_ppl = 999.
-    best_loss = 999.
+    best_ppl = utils.BestTracker('min')
+    best_loss = utils.BestTracker('min')
+    best_bleu = utils.BestTracker('max')
     for epoch in range(epochs):
-        logger.info("Epoch {}, LR = {}".format(epoch+1, optimizer.param_groups[0]["lr"]))
+        logger.info("Epoch {}/{}, LR = {}".format(epoch+1, epochs, optimizer.param_groups[0]["lr"]))
 
         # train
         trn_loss, trn_ppl = train(train_loader, seq2seq, optimizer, lr_scheduler, criterion,
@@ -264,16 +342,18 @@ if __name__ == "__main__":
         logger.info("\ttrain: Loss {:7.3f}  PPL {:7.3f}".format(trn_loss, trn_ppl))
 
         # validation
-        val_loss, val_ppl = evaluate(valid_loader, seq2seq, criterion)
-        logger.info("\tvalid: Loss {:7.3f}  PPL {:7.3f}".format(val_loss, val_ppl))
+        val_loss, val_ppl, val_bleu = evaluate(valid_loader, seq2seq, criterion, max_len)
+        logger.info("\tvalid: Loss {:7.3f}  PPL {:7.3f}  BLEU {:7.3f}".format(
+            val_loss, val_ppl, val_bleu))
 
         cur_step = len(train_loader) * (epoch+1)
         writer.add_scalar('val/loss', val_loss, cur_step)
         writer.add_scalar('val/ppl', val_ppl, cur_step)
+        writer.add_scalar('val/bleu', val_bleu, cur_step)
 
-        if val_ppl < best_ppl:
-            best_ppl = val_ppl
-            best_loss = val_loss
+        best_ppl.check(val_ppl, epoch+1)
+        best_loss.check(val_loss, epoch+1)
+        best_bleu.check(val_bleu, epoch+1)
 
         # evaluation & attention visualization
         logger.info("Random eval:")
@@ -284,4 +364,6 @@ if __name__ == "__main__":
         logger.info("")
 
     logger.info("Name: {}".format(args.name))
-    logger.info("Best: Loss {:7.3f}  PPL {:7.3f}".format(best_loss, best_ppl))
+    logger.info("Best: Loss {loss.val:7.3f} ({loss.ep})  PPL {ppl.val:7.3f} ({ppl.ep})  "
+                "BLEU {bleu.val:7.3f} ({bleu.ep})".format(
+                    loss=best_loss, ppl=best_ppl, bleu=best_bleu))

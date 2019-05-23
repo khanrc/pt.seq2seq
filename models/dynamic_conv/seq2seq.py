@@ -75,7 +75,7 @@ class DynamicConvS2S(nn.Module):
             dec_outs = []
             attn_ws = []
 
-            for i in range(self.max_len):
+            for i in range(self.max_len+1): # +1 for EOS
                 # cT = i+1 # current timestep
                 # [B, cT, tgt_n_words], [B, H, cT, S]
                 dec_out, attn_w = self.decoder(enc_out, dec_in, src_mask)

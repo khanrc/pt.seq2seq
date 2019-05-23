@@ -80,7 +80,7 @@ class Transformer(nn.Module):
             dec_outs = []
             attn_ws = []
 
-            for i in range(self.max_len):
+            for i in range(self.max_len+1):
                 cT = i+1 # current timestep
                 tgt_mask = self.left_only_mask[:, :cT, :cT]
                 # [B, cT, tgt_n_words], [B, H, cT, S]
