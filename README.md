@@ -33,8 +33,8 @@ Models:
 | Seq2Seq + KV attn             | 13.57 | 5.244 | 64.10 | |
 | Seq2Seq + Additive attn       | 13.28 | 5.054 | 64.48 | |
 | Seq2Seq + Multiplicative attn | 14.01 | 5.526 | | |
-| ConvS2S                       | 13.06 | 4.931 | | |
-| ConvS2S + out-caching         | 12.44 | 4.572 | | |
+| ConvS2S                       | 13.06 | 4.931 | 61.62 | |
+| ConvS2S + out-caching         | 12.44 | 4.572 | 60.90 | |
 | Transformer                   | 13.79 | 5.400 | 64.87 | something wrong? |
 | Transformer-Big               | 16.14 | 7.203 | | |
 | LightConv                     | 12.29 | 4.493 | | K=[3,3,5,5,7,7] |
@@ -43,6 +43,7 @@ Models:
 
 - Gradual Warmup does not helps
 - [!] BLEU is recorded in different run
+- PPL and BLEU does not match ...
 
 ## ToDo
 
