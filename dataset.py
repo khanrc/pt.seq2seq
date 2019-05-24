@@ -21,11 +21,12 @@ class TranslationDataset(Dataset):
 
         ids1 = self.to_ids(pair[0], self.in_lang) + [EOS_idx]
         ids2 = self.to_ids(pair[1], self.out_lang) + [EOS_idx]
-        # assume that PAD_idx == 0
         # +1 for EOS
-        ids1_np = np.zeros(self.max_len+1, dtype=np.long)
+        #ids1_np = np.zeros(self.max_len+1, dtype=np.long)
+        ids1_np = np.full([self.max_len+1], PAD_idx, dtype=np.long)
         ids1_np[:len(ids1)] = ids1
-        ids2_np = np.zeros(self.max_len+1, dtype=np.long)
+        #ids2_np = np.zeros(self.max_len+1, dtype=np.long)
+        ids2_np = np.full([self.max_len+1], PAD_idx, dtype=np.long)
         ids2_np[:len(ids2)] = ids2
 
         return (

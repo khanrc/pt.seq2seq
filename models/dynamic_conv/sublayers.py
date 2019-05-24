@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .convs import LightConv1d, DynamicConv1d
+from const import *
 
 
 class ConvBlock(nn.Module):
@@ -114,7 +115,7 @@ class PositionalEncoding(nn.Module):
 
 
 class ScaledEmbedding(nn.Module):
-    def __init__(self, n_words, d_model, padding_idx=0):
+    def __init__(self, n_words, d_model, padding_idx=PAD_idx):
         super().__init__()
         self.lut = nn.Embedding(n_words, d_model, padding_idx=padding_idx)
         self.scale = d_model ** 0.5

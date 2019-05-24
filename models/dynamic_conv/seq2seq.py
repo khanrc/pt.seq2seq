@@ -8,7 +8,7 @@ from const import *
 class DynamicConvS2S(nn.Module):
     def __init__(self, src_n_words, tgt_n_words, max_len, conv_type, kernel_sizes, d_model=512,
                  d_ff=2048, n_heads=8, dropout=0.1, norm_pos='after', wshare_readout_tgtemb=False,
-                 wshare_srcemb_tgtemb=False, pad_idx=0):
+                 wshare_srcemb_tgtemb=False, pad_idx=PAD_idx):
         """
         params:
             src_n_words
