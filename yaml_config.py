@@ -39,11 +39,7 @@ class YAMLConfig:
         # markdown
         return self.str().replace(' ', '&nbsp;').replace('\n', '  \n')
 
-    def update(self, opts, value):
-        """ update self._cfg with original type
-        opts: hierarchical option list. e.g.) ["model", "n_layers"]
-        value
-        """
+    def find_lastdic(self, opts):
         dic = self._cfg
         # search corresponding parent dic
         if len(opts) == 1 and opts[0] not in dic:
@@ -58,11 +54,21 @@ class YAMLConfig:
             # key-path case: e.g) ("model.batch_size", 128)
             for opt in opts[:-1]:
                 dic = dic[opt]
-            key = opts[-1]
-            assert key in dic, "{} is not the element of {}".format(key, self.path)
 
-        type_cls = type(dic[key])
-        dic[key] = type_cls(value)
+        return dic
+
+    def update(self, opts, value, type_cls=None):
+        """ update self._cfg with original type
+        opts: hierarchical option list. e.g.) ["model", "n_layers"]
+        value
+        type_cls: type class. if you want to force update, this must be given.
+        """
+        last_dic = self.find_lastdic(opts)
+        key = opts[-1]
+
+        if type_cls is None:
+            type_cls = type(last_dic[key])
+        last_dic[key] = type_cls(value)
 
     def parse_update(self, argv):
         """ parse argv & update self._cfg
@@ -71,12 +77,18 @@ class YAMLConfig:
         N = len(argv)
         assert N % 2 == 0
 
+        # insertable keys and type
+        insertable = {
+            "train.warmup": int
+        }
+
         for i in range(0, N, 2):
             opts = argv[i]
             value = argv[i+1]
             assert opts.startswith('--')
-            opts = opts[2:].split('.')
-            self.update(opts, value)
+            opts = opts[2:]
+            type_cls = insertable.get(opts, None)
+            self.update(opts.split('.'), value, type_cls=type_cls)
 
     def __repr__(self):
         return self.str()
