@@ -1,6 +1,6 @@
 import os
 import pickle
-from torchtext.datasets import Multi30k
+from torchtext.datasets import Multi30k, IWSLT, WMT14
 from torchtext.data import Field, BucketIterator, TabularDataset, Iterator
 from functools import partial
 import spacy
@@ -76,7 +76,14 @@ def get_data(name, max_len, min_freq, batch_size, batch_sort):
             (train_data, valid_data), **iterator_kwargs)
         test_loader = None
 
-    elif name == "multi30k":
+    else:
+        #if name == "multi30k":
+        datasets = {
+            "multi30k": Multi30k,
+            "iwslt": IWSLT,
+            "wmt14": WMT14
+        }[name]
+
         # tokenizer
         spacy_en = spacy.load('en')
         spacy_de = spacy.load('de')
@@ -90,7 +97,7 @@ def get_data(name, max_len, min_freq, batch_size, batch_sort):
         TRG = Field(tokenize=tokenize_trg, **field_kwargs)
 
         # data
-        train_data, valid_data, test_data = Multi30k.splits(
+        train_data, valid_data, test_data = datasets.splits(
             exts=('.de', '.en'), fields=(SRC, TRG),
             filter_pred=length_filter)
 
