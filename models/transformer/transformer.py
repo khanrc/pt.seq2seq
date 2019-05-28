@@ -67,20 +67,22 @@ class Transformer(nn.Module):
         # decoder
         B = src.size(0)
         use_teacher_forcing = torch.rand(1).item() < teacher_forcing
-        dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
         if use_teacher_forcing:
-            dec_in = torch.cat([dec_in, tgt[:, :-1]], dim=1)
+            dec_in = tgt[:, :-1] # remove eos & match length
             # tgt_mask: padding + left-only mask.
-            tgt_pad_mask = (tgt != self.pad_idx).unsqueeze(1) # [B, 1, T]
-            tgt_mask = tgt_pad_mask & self.left_only_mask # [B, 1, T] & [1, T, T] => [B, T, T]
+            tgt_pad_mask = (dec_in != self.pad_idx).unsqueeze(1) # [B, 1, T]
+            T = dec_in.size(-1)
+            tgt_mask = tgt_pad_mask & self.left_only_mask[:, :T, :T] # [B, 1, T] & [1, T, T] => [B, T, T]
             # [B, T, tgt_n_words], [B, T, H, S]
             dec_outs, attn_ws = self.decoder(enc_out, dec_in, src_mask, tgt_mask)
         else:
             # non-cache version
+            dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
             dec_outs = []
             attn_ws = []
+            dec_max_len = tgt.size(1)-1 if tgt is not None else self.max_len+1
 
-            for i in range(self.max_len+1):
+            for i in range(dec_max_len):
                 cT = i+1 # current timestep
                 tgt_mask = self.left_only_mask[:, :cT, :cT]
                 # [B, cT, tgt_n_words], [B, H, cT, S]

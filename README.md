@@ -28,7 +28,7 @@ Hparams:
 Models:
 
 | Model | Loss (sum) | PPL | BLEU\* | Note |
-| - | - | - | - |
+| - | - | - | - | - |
 | Seq2Seq                       | 15.11 | 6.320 | | |
 | Seq2Seq + KV attn             | 13.57 | 5.244 | 64.10 | |
 | Seq2Seq + Additive attn       | 13.28 | 5.054 | 64.48 | |
