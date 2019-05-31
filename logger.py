@@ -49,6 +49,11 @@ class Logger(logging.Logger):
         logging.setLoggerClass(logging.Logger) # restore
 
         if logger.hasHandlers():
+            # If logger already got all handlers (# handlers == 2), use the logger.
+            # else, re-set handlers.
+            if len(logger.handlers) == 2:
+                return logger
+
             logger.handlers.clear()
 
         log_format = '%(levelname)s::%(asctime)s | %(message)s'

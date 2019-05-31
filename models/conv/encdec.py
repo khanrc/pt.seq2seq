@@ -28,8 +28,8 @@ class ConvEncoder(nn.Module):
         self.n_layers = n_layers
 
         self.embedding = nn.Embedding(in_dim, emb_dim, padding_idx=PAD_idx)
-         # SOS, EOS
-        self.pos_embedding = nn.Embedding(max_len+2, emb_dim, padding_idx=PAD_idx)
+         # SOS, EOS, PAD
+        self.pos_embedding = nn.Embedding(max_len+3, emb_dim, padding_idx=0)
 
         # embedding => conv input dim (= h_dim)
         self.emb2hid = weight_norm(nn.Linear(emb_dim, h_dim))
@@ -52,10 +52,8 @@ class ConvEncoder(nn.Module):
         """
         B, L = src.shape
         mask = (src != PAD_idx).long()
-        # padding idx 처리가 필요한가?
-        #pos_tokens = torch.arange(L, device='cuda').repeat(B, 1)
         # padded pos_tokens
-        pos_tokens = mask.cumsum(dim=1) * mask + PAD_idx
+        pos_tokens = mask.cumsum(dim=1) * mask
 
         emb = self.embedding(src) # [B, L, emb_dim]
         pos_emb = self.pos_embedding(pos_tokens) # [B, L, emb_dim]
@@ -102,7 +100,7 @@ class ConvDecoder(nn.Module):
         self.cache_mode = cache_mode
 
         self.embedding = nn.Embedding(out_dim, emb_dim, padding_idx=PAD_idx)
-        self.pos_embedding = nn.Embedding(max_len+2, emb_dim, padding_idx=PAD_idx)
+        self.pos_embedding = nn.Embedding(max_len+3, emb_dim, padding_idx=0)
 
         self.emb2hid = weight_norm(nn.Linear(emb_dim, h_dim))
         self.hid2emb = weight_norm(nn.Linear(h_dim, emb_dim))
@@ -134,7 +132,7 @@ class ConvDecoder(nn.Module):
             assert L == 1
             assert cached[0].size(2) in [0, self.kernel_size]
         mask = (tgt != PAD_idx).long()
-        pos_tokens = mask.cumsum(dim=1) * mask + PAD_idx + timestep
+        pos_tokens = mask.cumsum(dim=1) * mask + timestep
 
         emb = self.embedding(tgt) # [B, L, emb_dim]
         pos_emb = self.pos_embedding(pos_tokens) # [B, L, emb_dim]
@@ -160,6 +158,7 @@ class ConvDecoder(nn.Module):
                 cached[i] = conv_in
             else:
                 conv_in = F.pad(out, [self.kernel_size-1, 0])
+
             # conv & activation
             out = conv(conv_in) # [B, h_dim*2, L]
             out = F.glu(out, dim=1) # [B, h_dim, L]

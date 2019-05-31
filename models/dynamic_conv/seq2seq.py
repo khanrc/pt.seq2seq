@@ -63,19 +63,19 @@ class DynamicConvS2S(nn.Module):
         # decoder
         B = src.size(0)
         use_teacher_forcing = torch.rand(1).item() < teacher_forcing
-        dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
         if use_teacher_forcing:
-            #tgt_mask = (tgt != self.pad_idx).unsqueeze(1) # [B, 1, T]
-            dec_in = torch.cat([dec_in, tgt[:, :-1]], dim=1)
+            dec_in = tgt[:, :-1]
             # tgt_mask: padding + left-only mask.
             # [B, T, tgt_n_words], [B, T, H, S]
             dec_outs, attn_ws = self.decoder(enc_out, dec_in, src_mask)
         else:
             # non-cache version
+            dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
             dec_outs = []
             attn_ws = []
+            dec_max_len = tgt.size(1)-1 if tgt is not None else self.max_len+1
 
-            for i in range(self.max_len+1): # +1 for EOS
+            for i in range(dec_max_len): # +1 for EOS
                 # cT = i+1 # current timestep
                 # [B, cT, tgt_n_words], [B, H, cT, S]
                 dec_out, attn_w = self.decoder(enc_out, dec_in, src_mask)

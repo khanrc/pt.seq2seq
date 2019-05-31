@@ -8,6 +8,8 @@ class ConvS2S(nn.Module):
     def __init__(self, in_dim, emb_dim, h_dim, out_dim, enc_layers, dec_layers, kernel_size,
                  dropout, max_len, cache_mode):
         super().__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
         self.encoder = ConvEncoder(in_dim, emb_dim, h_dim, n_layers=enc_layers,
                                    kernel_size=kernel_size, dropout=dropout, max_len=max_len)
         self.decoder = ConvDecoder(emb_dim, h_dim, out_dim, n_layers=dec_layers,
@@ -24,21 +26,19 @@ class ConvS2S(nn.Module):
         enc_out, attn_value, enc_mask = self.encoder(src)
         # decoder
         use_teacher_forcing = torch.rand(1).item() < teacher_forcing
-        dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
         if use_teacher_forcing:
-            # Convert tgt to dec_in: SOS 추가 / EOS 제거.
-            # EOS 를 제거하지 않는다고 문제가 생기는 것은 아님. 단지 할 필요가 없을 뿐.
-            # 어차피 해도 gt 가 pad 이므로 로스를 먹지 않음.
-            dec_in = torch.cat([dec_in, tgt[:, :-1]], dim=1)
+            dec_in = tgt[:, :-1]
             # [B, tgt_len, out_dim], [B, tgt_len, src_len]
             dec_outs, attn_ws, _ = self.decoder(dec_in, enc_out, attn_value, enc_mask)
         else:
+            dec_in = torch.full([B, 1], SOS_idx, dtype=torch.long, device='cuda')
             dec_outs = []
             attn_ws = []
+            dec_max_len = tgt.size(1)-1 if tgt is not None else self.max_len+1
             # cache is similar to hidden state of RNN.
             caches = [torch.empty([B, self.decoder.h_dim, 0], dtype=torch.float32, device='cuda')
                       for _ in range(self.decoder.n_layers)]
-            for i in range(self.max_len+1):
+            for i in range(dec_max_len):
                 # [B, cur_len, out_dim], [B, cur_len, src_len]
                 dec_out, attn_w, caches = self.decoder(
                     dec_in, enc_out, attn_value, enc_mask, caches, timestep=i)
