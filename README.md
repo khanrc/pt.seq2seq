@@ -1,13 +1,24 @@
-# Seq2Seq with Attention
+# Seq2seq
+
+Neural Machine Translation (NMT) models:
+
+- seq2seq (RNN)
+- seq2seq with attention (RNN + attention)
+- ConvS2S
+- Transformer
+- DynamicConv (+ LightConv)
 
 ## Run
 
 1. Download dataset from https://download.pytorch.org/tutorial/data.zip
-2. Run: `python train.py`
+2. Run: `python train.py config.yaml name`
 
-Etc:
+You can use multiple config.yaml (following config file overwrite if duplicate key exists) and direct config update in command line.
 
-- Hyperparams are in `config.yaml`.
+```
+# direct config update supports leaf-key only update
+python train.py cfgs/model/transformer.yaml cfgs/data/iwslt.yaml transformer-iwslt --train.warmup 4 --epochs 20
+```
 
 ## Dependencies
 
@@ -16,6 +27,22 @@ Etc:
 - pytorch >= 1.10
 - tensorboard >= 1.14
     - `pip install tb-nightly future`
+- torchtext
+- spacy
+    - `python -m spacy download en`
+    - `python -m spacy download de`
+
+Optionals: fire (for tb cleanup)
+
+```
+fire==0.1.3
+numpy==1.16.2
+PyYAML==5.1
+spacy==2.1.4
+tb-nightly==1.14.0a20190528
+torch==1.1.0
+torchtext==0.4.0
+```
 
 ## Results
 
@@ -48,14 +75,14 @@ Models:
 
 ## ToDo
 
-- torchtext (or torchnlp)
-    - Other dataset
 - Beam search
 - Add pre-trained word embeddings?
 - Word tokenization
     - BPE
     - Word piece model
-- AAN?
+- Models
+    - AAN
+    - Levenshtein
 
 ## References
 
