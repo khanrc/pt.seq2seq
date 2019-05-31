@@ -17,7 +17,6 @@ from warmup import WarmupLR
 import utils
 from models import get_model
 from evaluate import random_eval, evaluateAndShowAttentions
-from lang import Lang
 from logger import Logger
 from const import *
 from bleu import BLEU
@@ -27,20 +26,27 @@ from dataset import get_data
 ### Setup: load config, logger, and tb writer ###
 # arg parser
 parser = argparse.ArgumentParser("Seq2Seq")
-parser.add_argument("config_path")
+parser.add_argument("config_path", nargs="+")
 parser.add_argument("name")
 parser.add_argument("--param_tracing", action="store_true", default=False)
 parser.add_argument("--log_lv", default="info")
+parser.add_argument("--show", action="store_true", default=False)
 args, left_argv = parser.parse_known_args()
-if not args.config_path.endswith(".yaml"):
-    args.config_path += ".yaml"
 
 # prepare
 timestamp = utils.timestamp()
 utils.makedirs('logs')
 utils.makedirs('runs')
 # config
-cfg = YAMLConfig(args.config_path, left_argv)
+cfg = YAMLConfig(args.config_path[0])
+for config_path in args.config_path[1:]:
+    cfg.yaml_update(YAMLConfig(config_path))
+cfg.parse_update(left_argv)
+
+if args.show:
+    print(cfg.str())
+    exit()
+
 # logger
 logger_path = os.path.join('logs', "{}_{}.log".format(timestamp, args.name))
 logger = Logger.get(file_path=logger_path, level=args.log_lv)
@@ -104,6 +110,7 @@ def train(loader, seq2seq, optimizer, lr_scheduler, criterion, teacher_forcing, 
         cur_step = N*epoch + i
         writer.add_scalar('train/loss', loss, cur_step)
         writer.add_scalar('train/ppl', ppl, cur_step)
+        writer.add_scalar('train/lr', optimizer.param_groups[0]["lr"], cur_step)
 
         # step lr scheduler
         if isinstance(lr_scheduler, optim.lr_scheduler.ReduceLROnPlateau):
@@ -211,6 +218,12 @@ if __name__ == "__main__":
     logger.info("### Build model ###")
     seq2seq = get_model(model_type, in_dim, out_dim, max_len, cfg['model'])
     seq2seq.cuda()
+
+    ### init params
+    # 이렇게 하면 bias init 못하는 등의 문제가 있음...
+    for p in seq2seq.parameters():
+        if p.dim() > 1:
+            nn.init.xavier_uniform_(p)
 
     K = 1024
     n_params = utils.num_params(seq2seq) / K / K

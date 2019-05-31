@@ -90,6 +90,18 @@ class YAMLConfig:
             type_cls = insertable.get(opts, None)
             self.update(opts.split('.'), value, type_cls=type_cls)
 
+    def yaml_update(self, yaml):
+        def merge(org, supp):
+            """ update org dict from supp - support nested dic """
+            for k in supp.keys():
+                if isinstance(supp[k], dict) and k in org:
+                    assert isinstance(org[k], dict), "cannot update single value to dict"
+                    merge(org[k], supp[k])
+            else:
+                org[k] = supp[k]
+
+        merge(self._cfg, yaml._cfg)
+
     def __repr__(self):
         return self.str()
 

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from datetime import datetime
 
 
@@ -53,6 +54,33 @@ def makedirs(path):
 
 def timestamp(fmt="%y%m%d_%H-%M-%S"):
     return datetime.now().strftime(fmt)
+
+
+def tb_cleanup(logdir, backdir, threshold=100):
+    """ Cleanup tensorboard log dir
+    This function assumes that each dir has only one event file.
+
+    params:
+        logdir: tb events log dir
+        backdir: backup dir
+        threshold: minimum step threshold
+    """
+    makedirs(backdir)
+    backdir = Path(backdir)
+    from tensorboard.backend.event_processing.event_file_loader import EventFileLoader
+    paths = Path(logdir).glob("**/events*")
+
+    def max_step(path):
+        loader = EventFileLoader(path)
+        return max(s.step for s in loader.Load())
+
+    for path in list(paths):
+        step = max_step(str(path))
+        print("{} => {} steps".format(path.parent, step))
+        if step < threshold:
+            target_path = backdir / path.parent.name
+            path.parent.rename(target_path)
+            print("\t>> Dir {} is move to backup dir".format(path.parent))
 
 
 ###############################

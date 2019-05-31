@@ -35,15 +35,16 @@ Models:
 | Seq2Seq + Multiplicative attn | 14.01 | 5.526 | | |
 | ConvS2S                       | 13.06 | 4.931 | 61.62 | |
 | ConvS2S + out-caching         | 12.44 | 4.572 | 60.90 | |
-| Transformer                   | 13.79 | 5.400 | 64.87 | something wrong? |
-| Transformer-Big               | 16.14 | 7.203 | | |
+| Transformer-init              | 12.73 | 4.675 | 66.38 | |
 | LightConv                     | 12.29 | 4.493 | | K=[3,3,5,5,7,7] |
 | DynamicConv                   | 11.81 | 4.237 | 68.35 | K=[3,3,5,5,7,7] |
 | AAN (Averaged Attention)      | | | | |
 
-- Gradual Warmup does not helps
 - [!] BLEU is recorded in different run
 - PPL and BLEU does not match ...
+- Transformer
+    - after-norm does not work; should use before-norm.
+    - LR warmup and xavier init is important for performance
 
 ## ToDo
 
