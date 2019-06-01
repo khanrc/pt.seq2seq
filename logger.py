@@ -14,7 +14,7 @@ log_lv = {
 
 
 class Logger(logging.Logger):
-    NAME = 'ConvS2S'
+    NAME = 'S2S'
 
     def nofmt(self, msg, lvl=logging.INFO, *args, **kwargs):
         formatters = self.remove_formats()

@@ -1,0 +1,4 @@
+data:
+  name: org
+  max_len: 14
+  min_freq: 2

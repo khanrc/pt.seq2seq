@@ -1,0 +1,21 @@
+train:
+  batch_size: 256
+  epochs: 20
+  teacher_forcing: 0.5
+  grad_clip: 0.1
+model:
+  type: conv
+  h_dim: 512
+  emb_dim: 512
+  enc_layers: 10
+  dec_layers: 10
+  kernel_size: 3
+  dropout: 0.1
+  cache_mode: in
+eval:
+  N: 3
+  viz_attn: False
+data:
+  name: org
+  max_len: 14
+  min_freq: 2
