@@ -1,0 +1,21 @@
+train:
+  batch_size: 256
+  epochs: 20
+  teacher_forcing: 0.5
+  grad_clip: 0.1
+  warmup: 0
+model:
+  type: transformer
+  d_model: 512
+  d_ff: 2048
+  n_layers: 6
+  n_heads: 8
+  dropout: 0.1
+  norm_pos: before
+eval:
+  N: 3
+  viz_attn: False
+data:
+  name: org
+  max_len: 14
+  min_freq: 2

@@ -1,0 +1,4 @@
+data:
+  name: multi30k
+  max_len: 28
+  min_freq: 2

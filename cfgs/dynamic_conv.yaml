@@ -1,0 +1,23 @@
+train:
+  batch_size: 256
+  epochs: 20
+  teacher_forcing: 0.5
+  grad_clip: 0.1
+  warmup: 0
+model:
+  type: dynamic_conv
+  conv_type: dynamic
+  #  kernel_sizes: [3, 3, 5, 5, 7, 7]
+  kernel_sizes: [3, 5, 7, 9, 11, 15]
+  d_model: 512
+  d_ff: 2048
+  n_heads: 16
+  dropout: 0.1
+  norm_pos: before
+eval:
+  N: 3
+  viz_attn: False
+data:
+  name: org
+  max_len: 14
+  min_freq: 2

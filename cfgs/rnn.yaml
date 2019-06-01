@@ -1,0 +1,22 @@
+train:
+  batch_size: 256
+  epochs: 20
+  teacher_forcing: 0.5
+  grad_clip: 0.1
+model:
+  type: rnn
+  h_dim: 1024
+  emb_dim: 300
+  bidirect: True
+  # add, mul, kv
+  attention_type: add
+  dropout: 0.1
+  enc_layers: 1
+  dec_layers: 1
+eval:
+  N: 3
+  viz_attn: False
+data:
+  name: org
+  max_len: 14
+  min_freq: 2
