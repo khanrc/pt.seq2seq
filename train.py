@@ -8,7 +8,8 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 import torch.optim as optim
 import numpy as np
 from yaml_config import YAMLConfig
@@ -54,7 +55,7 @@ logger_path = os.path.join('logs', "{}_{}.log".format(timestamp, args.name))
 logger = Logger.get(file_path=logger_path, level=args.log_lv)
 # tb
 tb_path = os.path.join('runs', "{}_{}".format(timestamp, args.name))
-writer = SummaryWriter(log_dir=tb_path)
+writer = SummaryWriter(tb_path)
 
 
 def get_lens(tensor, max_len):

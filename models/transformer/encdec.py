@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from . import sublayers
+from .. import ops
 from . import layers
 
 
@@ -10,8 +10,8 @@ class Encoder(nn.Module):
                  n_heads=8, dropout=0.1, norm_pos='after'):
         super().__init__()
         self.norm_pos = norm_pos
-        self.w_emb = sublayers.ScaledEmbedding(src_n_words, d_model)
-        self.pos_encoder = sublayers.PositionalEncoding(d_model, max_len, dropout)
+        self.w_emb = ops.ScaledEmbedding(src_n_words, d_model)
+        self.pos_encoder = ops.PositionalEncoding(d_model, max_len, dropout)
         self.layers = nn.ModuleList([layers.EncoderLayer(d_model, d_ff, n_heads, dropout, norm_pos)
                                      for _ in range(n_layers)])
         if norm_pos == 'before':
@@ -37,8 +37,8 @@ class Decoder(nn.Module):
                  n_heads=8, dropout=0.1, norm_pos='after'):
         super().__init__()
         self.norm_pos = norm_pos
-        self.w_emb = sublayers.ScaledEmbedding(tgt_n_words, d_model)
-        self.pos_encoder = sublayers.PositionalEncoding(d_model, max_len, dropout)
+        self.w_emb = ops.ScaledEmbedding(tgt_n_words, d_model)
+        self.pos_encoder = ops.PositionalEncoding(d_model, max_len, dropout)
         self.layers = nn.ModuleList([layers.DecoderLayer(d_model, d_ff, n_heads, dropout, norm_pos)
                                      for _ in range(n_layers)])
         if norm_pos == 'before':

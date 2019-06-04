@@ -3,6 +3,36 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class ConvBlock(nn.Module):
+    """ Linear => GLU => (Light/Dynamic) Conv => Linear """
+    def __init__(self, conv_type, n_channels, kernel_size, stride=1, padding=(0, 0),
+                 n_heads=1, bias=True, dropconnect=0.):
+        super().__init__()
+        if conv_type == 'light':
+            self.conv = LightConv1d(n_channels, kernel_size, stride, padding, n_heads, bias,
+                                    dropconnect)
+        elif conv_type == 'dynamic':
+            self.conv = DynamicConv1d(n_channels, kernel_size, stride, padding, n_heads, bias,
+                                      dropconnect)
+
+        self.linear1 = nn.Linear(n_channels, n_channels*2)
+        self.linear2 = nn.Linear(n_channels, n_channels)
+
+    def forward(self, x, mask=None):
+        """
+        x: [B, T, C] (= [B, T, d_model])
+        mask: [B, 1, T]
+        """
+        x = self.linear1(x)
+        x = F.glu(x, dim=-1)
+        x = x.transpose(1,2).contiguous() # [B, C, T]
+        if mask is not None:
+            x.masked_fill_(mask == 0, 0.)
+        x = self.conv(x) # [B, C, T]
+        x = self.linear2(x.transpose(1,2)) # [B, T, C]
+        return x
+
+
 class LightConv1d(nn.Module):
     """ Lightweight convolution
     Ref: https://github.com/pytorch/fairseq/blob/master/fairseq/modules/lightweight_convolution.py

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from . import sublayers
+from .. import ops
 
 
 class EncoderLayer(nn.Module):
@@ -9,10 +9,10 @@ class EncoderLayer(nn.Module):
         super().__init__()
         # [!] caution: mask for multihead attention should be pad-mask (pad=1, value=0).
         # self.self_attn = nn.MultiHeadAttention(d_model, n_heads, dropout=dropout, need_weights=True)
-        self.slf_attn = sublayers.MultiHeadAttention(d_model, n_heads, dropout)
+        self.slf_attn = ops.MultiHeadAttention(d_model, n_heads, dropout)
         self.slf_attn_ln = nn.LayerNorm(d_model)
 
-        self.ffn = sublayers.PositionWiseFFN(d_model, d_ff, dropout)
+        self.ffn = ops.PositionWiseFFN(d_model, d_ff, dropout)
         self.ffn_ln = nn.LayerNorm(d_model)
 
         self.dropout = nn.Dropout(dropout)
@@ -47,13 +47,13 @@ class EncoderLayer(nn.Module):
 class DecoderLayer(nn.Module):
     def __init__(self, d_model, d_ff, n_heads, dropout, norm_pos='after'):
         super().__init__()
-        self.slf_attn = sublayers.MultiHeadAttention(d_model, n_heads, dropout)
+        self.slf_attn = ops.MultiHeadAttention(d_model, n_heads, dropout)
         self.slf_attn_ln = nn.LayerNorm(d_model)
 
-        self.enc_attn = sublayers.MultiHeadAttention(d_model, n_heads, dropout)
+        self.enc_attn = ops.MultiHeadAttention(d_model, n_heads, dropout)
         self.enc_attn_ln = nn.LayerNorm(d_model)
 
-        self.ffn = sublayers.PositionWiseFFN(d_model, d_ff, dropout)
+        self.ffn = ops.PositionWiseFFN(d_model, d_ff, dropout)
         self.ffn_ln = nn.LayerNorm(d_model)
 
         self.dropout = nn.Dropout(dropout)

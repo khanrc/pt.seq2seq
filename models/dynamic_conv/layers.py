@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .sublayers import ConvBlock, MultiHeadAttention, PositionWiseFFN
+from ..ops import MultiHeadAttention, PositionWiseFFN
+from .convs import ConvBlock
 
 
 class EncoderLayer(nn.Module):

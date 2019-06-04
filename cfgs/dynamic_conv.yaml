@@ -7,8 +7,8 @@ train:
 model:
   type: dynamic_conv
   conv_type: dynamic
-  #  kernel_sizes: [3, 3, 5, 5, 7, 7]
-  kernel_sizes: [3, 5, 7, 9, 11, 15]
+  kernel_sizes: [3, 3, 5, 5, 7, 7]
+  #kernel_sizes: [3, 5, 7, 9, 11, 15]
   d_model: 512
   d_ff: 2048
   n_heads: 16
