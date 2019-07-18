@@ -1,3 +1,4 @@
+import argparse
 import yaml
 
 
@@ -29,7 +30,7 @@ class YAMLConfig:
         # dictionary
         self._cfg = yaml.load(open(path), Loader=yaml.Loader)
         if argv:
-            self.parse_update(argv)
+            self.argv_update(argv)
 
     def str(self):
         # string w/o comments
@@ -70,7 +71,7 @@ class YAMLConfig:
             type_cls = type(last_dic[key])
         last_dic[key] = type_cls(value)
 
-    def parse_update(self, argv):
+    def argv_update(self, argv):
         """ parse argv & update self._cfg
         argv structure: [option1, value1, option2, value2, ...]
         """
@@ -97,8 +98,8 @@ class YAMLConfig:
                 if isinstance(supp[k], dict) and k in org:
                     assert isinstance(org[k], dict), "cannot update single value to dict"
                     merge(org[k], supp[k])
-            else:
-                org[k] = supp[k]
+                else:
+                    org[k] = supp[k]
 
         merge(self._cfg, yaml._cfg)
 
@@ -107,6 +108,30 @@ class YAMLConfig:
 
     def __getitem__(self, key):
         return self._cfg[key]
+
+    @staticmethod
+    def default_parser(name):
+        parser = argparse.ArgumentParser(name)
+        parser.add_argument("name")
+        parser.add_argument("config_paths", nargs="+")
+        parser.add_argument("--show", action="store_true", default=False)
+        return parser
+
+    @classmethod
+    def from_parser(cls, parser):
+        args, left_argv = parser.parse_known_args()
+        assert not args.name.endswith(".yaml")
+
+        cfg = cls(args.config_paths[0])
+        for config_path in args.config_paths[1:]:
+            cfg.yaml_update(cls(config_path))
+        cfg.argv_update(left_argv)
+
+        if args.show:
+            print(cfg.str())
+            exit()
+
+        return cfg, args
 
 
 if __name__ == "__main__":
@@ -117,5 +142,5 @@ if __name__ == "__main__":
     print("---")
     argv = argv[3:]
     print("argv:", argv)
-    config.parse_update(argv)
+    config.argv_update(argv)
     print(config.str())

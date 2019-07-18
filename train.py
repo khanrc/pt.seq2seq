@@ -26,29 +26,15 @@ from dataset import get_data
 
 ### Setup: load config, logger, and tb writer ###
 # arg parser
-parser = argparse.ArgumentParser("Seq2Seq")
-parser.add_argument("config_paths", nargs="+")
-parser.add_argument("name")
+parser = YAMLConfig.default_parser("Seq2Seq")
 parser.add_argument("--param_tracing", action="store_true", default=False)
 parser.add_argument("--log_lv", default="info")
-parser.add_argument("--show", action="store_true", default=False)
-args, left_argv = parser.parse_known_args()
-
-assert not args.name.endswith(".yaml"), f"the name argument is required"
+cfg, args = YAMLConfig.from_parser(parser)
 
 # prepare
 timestamp = utils.timestamp()
 utils.makedirs('logs')
 utils.makedirs('runs')
-# config
-cfg = YAMLConfig(args.config_paths[0])
-for config_path in args.config_paths[1:]:
-    cfg.yaml_update(YAMLConfig(config_path))
-cfg.parse_update(left_argv)
-
-if args.show:
-    print(cfg.str())
-    exit()
 
 # logger
 logger_path = os.path.join('logs', "{}_{}.log".format(timestamp, args.name))
