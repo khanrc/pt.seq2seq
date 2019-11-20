@@ -1,6 +1,6 @@
 # Seq2seq
 
-Neural Machine Translation (NMT) models:
+PyTorch implementations of seq2seq models for Neural Machine Translation (NMT) task:
 
 - seq2seq (RNN)
 - seq2seq with attention (RNN + attention)
@@ -13,6 +13,16 @@ Neural Machine Translation (NMT) models:
 Please refer to [no-torchtext](https://github.com/khanrc/seq2seq/tree/no-torchtext) tag.
 In this version, the `dataset.py`, `lang.py` and `data_prepare.py` structuralize low-level text to
 make it easier to use in the training code.
+
+## Supporting datasets
+
+Supporting datasets include pytorch tutorial ENG to FRA translation dataset and torchtext NMT datasets.
+
+- `org`: ENG to FRA translation from pytorch tutorial
+    - To use this data, please download dataset from https://download.pytorch.org/tutorial/data.zip first.
+- `multi30k`
+- `iwslt`
+- `wmt14`
 
 ## Dependencies
 
