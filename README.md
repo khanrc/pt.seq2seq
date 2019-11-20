@@ -8,17 +8,11 @@ Neural Machine Translation (NMT) models:
 - Transformer
 - DynamicConv (+ LightConv)
 
-## Run
+## No-torchtext version
 
-1. Download dataset from https://download.pytorch.org/tutorial/data.zip
-2. Run: `python train.py config.yaml name`
-
-You can use multiple config.yaml (following config file overwrite if duplicate key exists) and direct config update in command line.
-
-```
-# direct config update supports leaf-key only update
-python train.py cfgs/model/transformer.yaml cfgs/data/iwslt.yaml transformer-iwslt --train.warmup 4 --epochs 20
-```
+Please refer to [no-torchtext](https://github.com/khanrc/seq2seq/tree/no-torchtext) tag.
+In this version, the `dataset.py`, `lang.py` and `data_prepare.py` structuralize low-level text to
+make it easier to use in the training code.
 
 ## Dependencies
 
@@ -26,31 +20,16 @@ python train.py cfgs/model/transformer.yaml cfgs/data/iwslt.yaml transformer-iws
 - pyyaml
 - pytorch >= 1.10
 - tensorboard >= 1.14
-    - `pip install tb-nightly future`
 - torchtext
 - spacy
     - `python -m spacy download en`
     - `python -m spacy download de`
-
-Optionals: fire (for tb cleanup)
-
-```
-fire==0.1.3
-numpy==1.16.2
-PyYAML==5.1
-spacy==2.1.4
-tb-nightly==1.14.0a20190528
-torch==1.1.0
-torchtext==0.4.0
-```
 
 ## Results
 
 Hparams:
 
 - Task & data: ENG to FRA translation task, max\_len=14, min\_freq=2.
-- RNN: BiGRU, B=256, h\_dim=1024, emb\_dim=300, L=1, dropout=0.1.
-    - L=1, dropout=0.1 is best in variations.
 
 Models:
 
@@ -65,24 +44,19 @@ Models:
 | Transformer-init              | 12.73 | 4.675 | 66.38 | |
 | LightConv                     | 12.29 | 4.493 | | K=[3,3,5,5,7,7] |
 | DynamicConv                   | 11.81 | 4.237 | 68.35 | K=[3,3,5,5,7,7] |
-| AAN (Averaged Attention)      | | | | |
 
 - [!] BLEU is recorded in different run
-- PPL and BLEU does not match ...
-- Transformer
+- PPL and BLEU does not match
+- about the Transformer
     - after-norm does not work; should use before-norm.
-    - LR warmup and xavier init is important for performance
+    - LR warmup and xavier init is important for the performance
 
 ## ToDo
 
 - Beam search
-- Add pre-trained word embeddings?
 - Word tokenization
     - BPE
     - Word piece model
-- Models
-    - AAN
-    - Levenshtein
 
 ## References
 
