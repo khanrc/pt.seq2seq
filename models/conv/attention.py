@@ -7,9 +7,6 @@ from torch.nn.utils import weight_norm
 class ConvS2SAttention(nn.Module):
     def __init__(self, emb_dim, h_dim):
         super().__init__()
-        """
-        ConvS2S attention 은 residual 을 계산함
-        """
         self.q_proj = weight_norm(nn.Linear(h_dim, emb_dim))
         self.out = weight_norm(nn.Linear(emb_dim, h_dim))
         self.scale = 0.5 ** 0.5

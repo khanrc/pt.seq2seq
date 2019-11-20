@@ -37,12 +37,12 @@ class LightConv1d(nn.Module):
     """ Lightweight convolution
     Ref: https://github.com/pytorch/fairseq/blob/master/fairseq/modules/lightweight_convolution.py
 
-    Conv1d 모듈을 활용하여 parameter sharing 구현.
-    H 개의 heads 가 있다고 하면: depthwise conv1d = [H, K] kernel weights.
-    데이터가 K width 라고 가정하자: [B, K, h_dim] (h_dim % H == 0)
-    이 때 각 헤드에 들어가는 shared kernel 의 개수는 N = h_dim // H.
-    이 때 [B*N, K, H] 로 변환하여 depthwise conv1d 를 태우면 batch dim 에서는 kernel 이 공유되므로
-    자연스럽게 parameter sharing 을 구현할 수 있다.
+    Implements weight-sharing of LightConv through reshaping batch dim and channel dim.
+    for H = n_heads,
+        N = h_dim // H  (# of shared kernel applied):
+    input x: [B, T, h_dim] (h_dim % H == 0),
+    x_reshaped: [B*N, T, H]
+    Then Conv1d(x_reshaped) sharing there kernels.
     """
     def __init__(self, n_channels, kernel_size, stride=1, padding=(0, 0), n_heads=1, bias=True,
                  dropconnect=0.):
@@ -59,9 +59,6 @@ class LightConv1d(nn.Module):
 
         self.weight = nn.Parameter(torch.empty(n_heads, 1, kernel_size)) # [H, 1, K]
         if bias:
-            # ref code 에서는 bias 는 sharing 하지 않고 C 개만큼 생성하여 사용하나,
-            # 여기서는 그냥 weight 와 함께 sharing 하여 H 개만 생성.
-            # 어차피 코드를 보니 안 쓰는 듯.
             self.bias = nn.Parameter(torch.empty(n_heads)) # [H]
         else:
             self.bias = None
@@ -106,14 +103,15 @@ class LightConv1d(nn.Module):
 class DynamicConv1d(nn.Module):
     """ Dynamic convolution
     Ref: https://github.com/pytorch/fairseq/blob/master/fairseq/modules/dynamic_convolution.py
+    for C=h_dim, T=seq_len, H=n_heads, K=kernel_width:
     x: [B, C, T].
     W: [H, K, C].
-    kernel: x @ W => [B, T, H, K]. (= Linear(C, H*K))
-    즉, data point 별로 time-dependent 한 kernel 을 구할 수 있음.
+    (dynamic) kernel: x @ W => [B, T, H, K]. (= Linear(C, H*K))
+    That is, each (shared) kernel has different weights in each timestep, for each datapoint.
 
-    그러면 weight sharing 이 없기 때문에 기존의 conv1d 를 사용할 수가 없으므로,
-    conv 연산을 직접 구현한다. conv 를 matrix multiplication (MM) 으로 표현해야
-    효율적 계산이 가능하다.  두 가지 방법이 있는데:
+    Since this dynamic conv method cannot exploit the Conv1d like in LightConv,
+    we implement conv operation using matrix multiplication (MM).
+    There is two methods for this:
     1) input unfolding
         input 을 conv 연산에 맞도록 window 간에 겹치는 부분을 카피해서
         MM이 가능하도록 해주는 방식.

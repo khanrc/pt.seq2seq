@@ -118,7 +118,6 @@ def evaluate(loader, seq2seq, criterion, max_len):
 
     tot_st = time.time()
     bleu_time = 0.
-    # BLEU time: 13k 개에 대해서 약 4s. multi-cpu parallelization 은 가능함.
 
     with torch.no_grad():
         for i, example in enumerate(loader):
@@ -150,9 +149,7 @@ def evaluate(loader, seq2seq, criterion, max_len):
 
 
 def criterion(logits, targets):
-    """
-    배치 내에서는 summation 을 하고, 배치끼리는 mean 을 하고 싶다.
-    (TODO) 클래스로 따로 빼는게 낫겠는데...
+    """ Cross-entropy with intra-batch summation and inter-batch meaning
     logits: [B, max_len, out_lang.n_words]
     targets: [B, max_len]
     """
@@ -209,7 +206,7 @@ if __name__ == "__main__":
     seq2seq.cuda()
 
     ### init params
-    # 이렇게 하면 bias init 못하는 등의 문제가 있음...
+    # NOTE no bias init ...
     for p in seq2seq.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
@@ -221,15 +218,6 @@ if __name__ == "__main__":
 
     # parameter size tracing
     if args.param_tracing:
-        # sequential tracing
-        #  for name, p in seq2seq.named_parameters():
-        #      numel = p.numel()
-        #      unit = 'M'
-        #      numel /= 1024*1024
-        #      fmt = "10.3f" if numel < 1.0 else "10.1f"
-
-        #      print("{:50s}\t{:{fmt}}{}".format(name, numel, unit, fmt=fmt))
-
         # recursive tracing
         def param_trace(name, module, depth, max_depth=999, threshold=0):
             if depth > max_depth:
@@ -249,10 +237,7 @@ if __name__ == "__main__":
         exit()
 
     ## optimizer
-    #optimizer = optim.Adamax(seq2seq.parameters())
-
     T_ep = len(train_loader)
-    #optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4, betas=(0.9, 0.98), eps=1e-9)
     optimizer = optim.Adam(seq2seq.parameters(), lr=3e-4)
     lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=T_ep*epochs, eta_min=3e-6)
     if 'warmup' in cfg['train']:

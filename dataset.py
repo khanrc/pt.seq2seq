@@ -36,17 +36,17 @@ def get_data(name, max_len, min_freq, batch_size, batch_sort, device='cuda'):
         import unicodedata
 
         # unicode => ascii
-        # C 위에 점찍혀있다거나 그런 문자들 그냥 알파벳으로 바꿔줌
+        # Convert special alphabet to normal alphabet
         def unicode2ascii(s):
             asc = [c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn']
             return ''.join(asc)
 
-        # lowercase, trim, remove non-letters
+        # lowercase, trim, remove non-letters: letters including only alphabet and .!?
         def normalize(s):
             s = unicode2ascii(s.lower().strip())
-            # .!? 에 대해 띄어쓰기를 해줌. hi! => hi !
+            # Add spaces to .!?  (e.g. hi! => hi !)
             s = re.sub(r"([.!?])", r" \1", s)
-            # alphabet, .!? 이 아니면 공백으로 변경. hey11 ! => hey   !
+            # Convert extra characters to spaces  (e.g. hey11 ! => hey   !)
             s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
             return s.split()
 

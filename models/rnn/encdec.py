@@ -27,56 +27,23 @@ class Encoder(nn.Module):
         B = x.size(0)
         emb = self.embedding(x) # [B, seq_len, h_dim]
         emb = self.dropout(emb)
-        # hidden 은 last state 만 나오고, out 은 각 타임스텝 다 나옴.
-        # hidden 은 pack sequence 에 대해 각 길이에 맞게 마지막 타임스텝을 뽑아주고,
-        # bidirectional case 에 대해서도 대응을 해 줌.
         emb = nn.utils.rnn.pack_padded_sequence(emb, x_lens, batch_first=True)
-        # [B, seq_len, h_dim * n_direction], [n_layers * n_direction, B, h_dim]
+        # out: [B, seq_len, h_dim * n_direction]; every hidden states in each timestep
+        # h: [n_layers * n_direction, B, h_dim]; last hidden state
+        # h also consider each sequence length and bidirectionality.
         out, h = self.gru(emb, h)
         out, x_lens = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)
 
-        # hidden 에다 추가 연산을 하는 것은 context vector 를 위한 것이지,
-        # attention 을 위한 것이 아님. 어차피 그건 out 에 대해서 연산.
+        # additional computation to hidden state for context vector (not for attention)
         h = h.view(self.n_layers, self.n_direct, B, self.h_dim)
         # concat bidirect hidden states in last layer
         # => [n_layers, B, h_dim*n_direct]
         h = torch.cat([h[:, i] for i in range(self.n_direct)], dim=-1)
-        #  if self.n_direct == 2:
-        #      h = torch.cat([h[0], h[1]], dim=-1).unsqueeze(0) # [1, B, h_dim*n_direct]
 
         # dimension matching (h_dim*n_direct => h_dim)
         h = torch.tanh(self.linear(h))
 
-        return out, h # attention 을 위한 out 도 리턴.
-
-
-# AttnDecoder 에서 Non-attention 까지 커버
-#  class Decoder(nn.Module):
-#      """ Simple decoder without attention """
-#      def __init__(self, emb_dim, h_dim, out_dim):
-#          super().__init__()
-#          self.h_dim = h_dim
-#          self.out_dim = out_dim # out_lang.n_words
-#          # decoder 도 인풋은 word.
-#          # 이전 timestep 의 output 이거나,
-#          # 이전 timestep 의 true target (teacher-forcing)
-#          self.embedding = nn.Embedding(out_dim, emb_dim, padding_idx=PAD_idx)
-#          self.gru = nn.GRU(emb_dim, h_dim, batch_first=True)
-#          self.readout = nn.Linear(h_dim, out_dim)
-
-#      def forward(self, x, h=None):
-#          """
-#          x: [B, seq_len, token_ids]
-
-#          enc_hs and mask are not used here - just for protocol compatibility.
-#          """
-#          emb = self.embedding(x) # [B, seq_len, h_dim]
-#          emb = F.relu(emb) # why?
-#          # out: [B, seq_len, h_dim]
-#          # h: [1, B, h_dim] (1 <= n_layers * n_direction)
-#          out, h = self.gru(emb, h)
-#          logits = self.readout(out)
-#          return logits, h
+        return out, h  # out for attention
 
 
 class AttnDecoder(nn.Module):
@@ -111,7 +78,6 @@ class AttnDecoder(nn.Module):
         else:
             self.attention = None
 
-        #self.attn_combine = nn.Linear(h_dim * 2, h_dim)
         ro_dim = h_dim * (2 if self.attention is not None else 1)
         self.readout = nn.Linear(ro_dim, out_dim)
 
@@ -138,8 +104,6 @@ class AttnDecoder(nn.Module):
 
             # combine emb out & attention out
             out = torch.cat([out, attn_out], dim=-1) # [B, dec_len, h_dim*2]
-            #  out = self.attn_combine(out) # [B, dec_len, h_dim]
-            #  out = F.relu(out)
         else:
             B = x.size(0)
             attn_w = torch.zeros([B, dec_len, enc_len], dtype=torch.float32)

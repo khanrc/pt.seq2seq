@@ -40,14 +40,13 @@ class Seq2Seq(nn.Module):
 
         if use_teacher_forcing:
             # Teacher forcing: Feed the target as the next input
-            # 체크: tgt 에 마지막껀 왜 빼지? EOS 일텐데. EOS 도 예측해야 하는거 아닌가?
-            # => EOS 가 입력으로 들어올 필욘 없다. 그 전에 끝남;
             dec_in = tgt[:, :-1]
             # attn_w: [B, dec_len, enc_len]
             dec_outs, dec_h, attn_ws = self.decoder(dec_in, dec_h, enc_out, attn_mask)
         else:
             # Without Teacher forcing: use its own predictions as the next input
-            # tgt_lens 에는 SOS, EOS 가 포함되어 있어서 -1, max_len 에는 둘다 포함이 안되어 있어서 +1.
+            # tgt_lens include SOS and EOS => -1
+            # max_len does not include SOS and EOS => +1
             dec_max_len = tgt_lens.max()-1 if tgt_lens is not None else self.max_len+1
             dec_outs = []
             for i in range(dec_max_len):
@@ -58,8 +57,6 @@ class Seq2Seq(nn.Module):
 
                 dec_outs.append(dec_out)
                 attn_ws.append(attn_w)
-                # EOS 가 나온 애들을 잘라줄 수도 있지만 놔둠
-                # => 차이: (pred) EOS 가 나오고 난 이후에도 loss 를 먹일 것인가 말 것인가
 
             dec_outs = torch.cat(dec_outs, dim=1)
             attn_ws = torch.cat(attn_ws, dim=1)

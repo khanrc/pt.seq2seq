@@ -77,19 +77,12 @@ class ConvEncoder(nn.Module):
 
 
 class ConvDecoder(nn.Module):
-    """
-    ConvDecoder 는 매 타임스텝마다 굳이 이전 타임스텝들의 conv 연산을 새로 할 필요가 없음
-
-    conv_in: [B, T, emb_dim] => [B, 1, h_dim]
-        여기에 cached: [B, T-1, h_dim] 이 있다고 하면, concat(cached, conv_in) 하여 인풋을 생성하고,
-        concat[-kernel_size:] 만 사용해서 conv inference 를 하면 됨.
-        만약 T < kernel_size 인 경우 부족한 만큼 zero-padding.
-    """
     def __init__(self, emb_dim, h_dim, out_dim, n_layers, kernel_size, dropout, max_len,
                  cache_mode='in'):
         """
         params:
-            cache_mode: in / out. in 이면 논문 그대로고, out 이면 이전 타임스텝의 out 을 캐싱.
+            cache_mode: in / out. `in` mode works same as paper,
+                        but `out` mode caches 1-step before outputs.
         """
         super().__init__()
         self.emb_dim = emb_dim
